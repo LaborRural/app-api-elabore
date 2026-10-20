@@ -7,6 +7,7 @@ import { formatCellValue } from "@/lib/format";
 import { getNestedValue, type ColumnDef, type ScreenDef } from "@/lib/screens";
 import type { AgroindustryItem, PropertySummaryItem } from "@/lib/api";
 import ScreenFilters from "./screen-filters";
+import ExportMenu, { type ExportFormat } from "./export-menu";
 
 type Props = {
   screen: ScreenDef;
@@ -22,6 +23,89 @@ type Props = {
   notice?: string;
   effectivePropertyId?: string;
 };
+
+/** Setas de ordenação empilhadas (↑ sobre ↓); a direção ativa fica escura. */
+function SortIcon({ dir }: { dir?: "asc" | "desc" }) {
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2.4,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
+  };
+  return (
+    <span className="th-sort">
+      <svg {...common} className={dir === "asc" ? "on" : ""}>
+        <line x1="12" y1="19" x2="12" y2="5" />
+        <polyline points="5 12 12 5 19 12" />
+      </svg>
+      <svg {...common} className={dir === "desc" ? "on" : ""}>
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <polyline points="19 12 12 19 5 12" />
+      </svg>
+    </span>
+  );
+}
+
+const PAGER_ICONS = {
+  first: ["M11 7l-5 5l5 5", "M17 7l-5 5l5 5"],
+  prev: ["M15 6l-6 6l6 6"],
+  next: ["M9 6l6 6l-6 6"],
+  last: ["M7 7l5 5l-5 5", "M13 7l5 5l-5 5"],
+};
+
+function PagerIcon({ name }: { name: keyof typeof PAGER_ICONS }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {PAGER_ICONS[name].map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
+/** Campo "Página [n] de N": reinicia sozinho quando a página muda (via key). */
+function PageJump({
+  page,
+  pages,
+  onGo,
+}: {
+  page: number;
+  pages: number;
+  onGo: (n: number) => void;
+}) {
+  const [value, setValue] = useState(String(page));
+
+  function commit() {
+    const n = Math.min(pages, Math.max(1, Math.floor(Number(value)) || page));
+    setValue(String(n));
+    onGo(n);
+  }
+
+  return (
+    <input
+      className="pager-input"
+      inputMode="numeric"
+      value={value}
+      aria-label="Ir para a página"
+      onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === "Enter" && commit()}
+    />
+  );
+}
 
 export default function ScreenTable({
   screen,
@@ -44,9 +128,10 @@ export default function ScreenTable({
   const currentSort = searchParams.get("sort") ?? "";
   const currentDir = searchParams.get("dir") ?? "asc";
 
-  const [colFilters, setColFilters] = useState<Record<string, string>>({});
-  const [showColFilters, setShowColFilters] = useState(false);
-  const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
+  function goToPage(n: number) {
+    if (n !== page) router.push(buildUrl({ page: n }));
+  }
 
   function buildUrl(updates: Record<string, string | number | undefined>) {
     const sp = new URLSearchParams(searchParams.toString());
@@ -66,119 +151,69 @@ export default function ScreenTable({
     router.push(buildUrl({ sort: colKey, dir: nextDir, page: 1 }));
   }
 
-  function handleExport(formato: "csv" | "xlsx") {
-    setExporting(formato);
-    const sp = new URLSearchParams(searchParams.toString());
-    sp.set("formato", formato);
-    if (activeTabId && !sp.get("aba")) {
-      sp.set("aba", activeTabId);
+  function handleExport(formato: ExportFormat) {
+    if (formato === "excel" || formato === "csv") {
+      const targetFmt = formato === "excel" ? "xlsx" : "csv";
+      setExporting(targetFmt.toUpperCase());
+      const sp = new URLSearchParams(searchParams.toString());
+      sp.set("formato", targetFmt);
+      if (activeTabId && !sp.get("aba")) {
+        sp.set("aba", activeTabId);
+      }
+      const url = `/api/export/${screen.slug}?${sp.toString()}`;
+      window.location.href = url;
+      setTimeout(() => setExporting(null), 2500);
+    } else if (formato === "pdf-resumido" || formato === "pdf-expandido") {
+      window.print();
     }
-    const url = `/api/export/${screen.slug}?${sp.toString()}`;
-    window.location.href = url;
-    setTimeout(() => setExporting(null), 2200);
   }
 
-  // Filtragem rápida por coluna na página atual
-  const filteredRows = rows.filter((row) =>
-    Object.entries(colFilters).every(([colKey, filterVal]) => {
-      if (!filterVal.trim()) return true;
-      const colDef = columns.find((c) => c.key === colKey);
-      const formatted = formatCellValue(getNestedValue(row, colKey), colDef?.type);
-      return formatted.toLowerCase().includes(filterVal.trim().toLowerCase());
-    }),
-  );
-
-  // Cálculo de páginas visíveis na barra de paginação
-  const pageNumbers: number[] = [];
-  const startPage = Math.max(1, page - 2);
-  const endPage = Math.min(pages, startPage + 4);
-  for (let p = startPage; p <= endPage; p++) {
-    pageNumbers.push(p);
-  }
+  const filteredRows = rows;
+  const sizeOptions = Array.from(new Set([15, 20, 30, 40, 50, size])).sort((a, b) => a - b);
 
   return (
     <div className="flex flex-col gap-3">
-      {/* CABEÇALHO DA TELA + ABAS + BOTÕES DE EXPORTAÇÃO */}
-      <div className="panel-card !py-3 !px-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-[var(--green-100)] px-1.5 py-0.5 text-[9.5px] font-extrabold tracking-wider text-[var(--green-800)]">
-                {screen.code}
-              </span>
-              <span className="text-[11px] font-semibold text-[var(--muted)]">
-                {screen.group}
-              </span>
-            </div>
-            <h1 className="mt-0.5 text-lg font-extrabold tracking-tight text-[var(--ink-strong)]">
-              {screen.title}
-            </h1>
-            <p className="text-xs text-[var(--muted)]">{screen.subtitle}</p>
-          </div>
-
-          {!screen.unavailableReason && (
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleExport("csv")}
-                disabled={exporting !== null}
-                className="btn-table-export"
-                title="Baixar todos os registros filtrados em CSV (UTF-8 com BOM, separador ;)"
-              >
-                <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
-                  csv
-                </span>
-                <span>{exporting === "csv" ? "Gerando CSV…" : "Exportar CSV"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleExport("xlsx")}
-                disabled={exporting !== null}
-                className="btn-table-export btn-table-export--primary"
-                title="Baixar planilha formatada no padrão excel_format (Aptos 11, cabeçalho #247B72, listrado)"
-              >
-                <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
-                  download
-                </span>
-                <span>
-                  {exporting === "xlsx" ? "Gerando XLSX…" : "Exportar XLSX (Padrão LR)"}
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* SELETOR DE ABAS (quando a tela possui mais de um endpoint) */}
-        {screen.tabs && screen.tabs.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[var(--line-soft)] pt-2.5">
-            {screen.tabs.map((tab) => {
-              const isSelected = tab.id === activeTabId;
-              return (
-                <Link
-                  key={tab.id}
-                  href={buildUrl({ aba: tab.id, page: 1, id: undefined })}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors ${
-                    isSelected
-                      ? "bg-[#0f6e56] text-white shadow-xs"
-                      : "bg-[var(--surface-soft)] text-[var(--ink)] hover:bg-[var(--green-100)] hover:text-[var(--green-900)]"
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+      {/* CABEÇALHO DA TELA + SELETOR DE ABAS */}
+      <div>
+        <h1 className="page-title">{screen.title}</h1>
+        {screen.subtitle && <p className="page-subtitle">{screen.subtitle}</p>}
       </div>
 
-      {/* BARRA DE FILTROS */}
-      <ScreenFilters
-        filters={screen.filters}
-        properties={properties}
-        agroindustries={agroindustries}
-        effectivePropertyId={effectivePropertyId}
-      />
+      {/* ABAS SUBLINHADAS (quando a tela possui mais de um endpoint) */}
+      {screen.tabs && screen.tabs.length > 0 && (
+        <nav className="tabs-underline" aria-label="Abas da tela">
+          {screen.tabs.map((tab) => (
+            <Link
+              key={tab.id}
+              href={buildUrl({ aba: tab.id, page: 1, id: undefined })}
+              className={`tab-underline ${tab.id === activeTabId ? "active" : ""}`}
+              aria-current={tab.id === activeTabId ? "page" : undefined}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {/* BARRA: EXPORTAR (esquerda) · BUSCA + FILTROS (direita) */}
+      {!screen.unavailableReason && (
+        <div className="lancamentos-filtro-bar">
+          <div className="lanc-filtro-esq">
+            <ExportMenu
+              onExport={handleExport}
+              disabled={exporting !== null}
+              exportingFormat={exporting}
+            />
+          </div>
+
+          <ScreenFilters
+            filters={screen.filters}
+            properties={properties}
+            agroindustries={agroindustries}
+            effectivePropertyId={effectivePropertyId}
+          />
+        </div>
+      )}
 
       {/* AVISO / NOTA INFORMATIVA */}
       {notice && !screen.unavailableReason && (
@@ -207,58 +242,7 @@ export default function ScreenTable({
         </div>
       ) : (
         /* PAINEL DA TABELA DE DADOS */
-        <div className="panel-card">
-          {/* Barra superior da tabela */}
-          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-extrabold text-[var(--ink-strong)]">
-                {total.toLocaleString("pt-BR")}{" "}
-                {total === 1 ? "registro encontrado" : "registros encontrados"}
-              </span>
-              {Object.values(colFilters).some((v) => v.trim()) && (
-                <span className="badge badge-info">
-                  {filteredRows.length} visíveis no filtro de coluna
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowColFilters((v) => !v)}
-                className={`inline-flex h-7 items-center gap-1 rounded border px-2.5 text-[11px] font-semibold cursor-pointer transition-colors ${
-                  showColFilters
-                    ? "border-[var(--metric-green)] bg-[var(--green-100)] text-[var(--green-900)]"
-                    : "border-[var(--line)] bg-[var(--surface-soft)] text-[var(--muted)] hover:text-[var(--ink-strong)]"
-                }`}
-                title="Exibir ou ocultar filtros individuais por coluna"
-              >
-                <span className="material-symbols-rounded" style={{ fontSize: 15 }}>
-                  filter_list
-                </span>
-                <span>Filtro por coluna</span>
-              </button>
-
-              <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
-                <label htmlFor="pageSizeSelect" className="font-semibold">
-                  Por página:
-                </label>
-                <select
-                  id="pageSizeSelect"
-                  value={size}
-                  onChange={(e) =>
-                    router.push(buildUrl({ size: Number(e.target.value), page: 1 }))
-                  }
-                  className="h-7 rounded border border-[var(--line)] bg-[var(--surface-soft)] px-2 text-xs font-bold text-[var(--ink-strong)] outline-none cursor-pointer"
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
+        <div className="flex flex-col">
           {/* Tabela com rolagem */}
           <div className="table-scroll">
             <table className="data-table">
@@ -282,41 +266,18 @@ export default function ScreenTable({
                           col.type !== "parcelas_link" ? "sortable" : ""
                         } ${alignClass}`}
                       >
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1.5">
                           <span>{col.label}</span>
                           {col.type !== "parcelas_link" && (
-                            <span className="text-[9.5px] opacity-60">
-                              {isSorted ? (currentDir === "asc" ? "▲" : "▼") : "↕"}
-                            </span>
+                            <SortIcon
+                              dir={isSorted ? (currentDir === "asc" ? "asc" : "desc") : undefined}
+                            />
                           )}
                         </span>
                       </th>
                     );
                   })}
                 </tr>
-
-                {showColFilters && (
-                  <tr className="table-filter-row">
-                    {columns.map((col) => (
-                      <th key={`flt-${col.key}`}>
-                        {col.type !== "parcelas_link" ? (
-                          <input
-                            type="text"
-                            value={colFilters[col.key] ?? ""}
-                            onChange={(e) =>
-                              setColFilters((prev) => ({
-                                ...prev,
-                                [col.key]: e.target.value,
-                              }))
-                            }
-                            placeholder={`Filtrar ${col.label.toLowerCase()}...`}
-                            className="table-col-filter"
-                          />
-                        ) : null}
-                      </th>
-                    ))}
-                  </tr>
-                )}
               </thead>
 
               <tbody>
@@ -342,6 +303,30 @@ export default function ScreenTable({
                             >
                               {active ? "Ativo" : "Inativo"}
                             </span>
+                          </td>
+                        );
+                      }
+
+                      if (col.type === "consistencia") {
+                        const value = String(raw ?? "").toUpperCase();
+                        if (!value) {
+                          return (
+                            <td key={col.key} className={alignClass}>
+                              —
+                            </td>
+                          );
+                        }
+                        const badgeClass =
+                          value === "CONSISTENTE"
+                            ? "badge-positive"
+                            : value === "INCONSISTENTE"
+                              ? "badge-danger"
+                              : value === "OUTLIER"
+                                ? "badge-warning"
+                                : "badge-neutral";
+                        return (
+                          <td key={col.key} className={alignClass}>
+                            <span className={`badge ${badgeClass}`}>{value}</span>
                           </td>
                         );
                       }
@@ -423,71 +408,72 @@ export default function ScreenTable({
           </div>
 
           {/* Rodapé de paginação */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line-soft)] pt-3 text-xs text-[var(--muted)]">
-            <div>
-              Página <strong className="text-[var(--ink-strong)]">{page}</strong> de{" "}
-              <strong className="text-[var(--ink-strong)]">{pages}</strong> · Exibindo{" "}
-              <strong className="text-[var(--ink-strong)]">{filteredRows.length}</strong>{" "}
-              itens nesta página (total:{" "}
-              <strong className="text-[var(--ink-strong)]">
-                {total.toLocaleString("pt-BR")}
-              </strong>
-              )
-            </div>
+          <div className="pager-bar">
+            <p className="pager-total">
+              Total de resultados: <strong>{total.toLocaleString("pt-BR")}</strong>
+            </p>
 
-            <nav className="flex items-center gap-1" aria-label="Paginação">
+            <nav className="pager-nav" aria-label="Paginação">
               <Link
                 href={buildUrl({ page: 1 })}
-                className={`pagination-btn ${
-                  page <= 1 ? "pointer-events-none opacity-40" : ""
-                }`}
+                className={`pager-btn ${page <= 1 ? "disabled" : ""}`}
                 title="Primeira página"
+                aria-label="Primeira página"
+                aria-disabled={page <= 1}
               >
-                «
+                <PagerIcon name="first" />
               </Link>
               <Link
                 href={buildUrl({ page: Math.max(1, page - 1) })}
-                className={`pagination-btn ${
-                  page <= 1 ? "pointer-events-none opacity-40" : ""
-                }`}
+                className={`pager-btn ${page <= 1 ? "disabled" : ""}`}
                 title="Página anterior"
+                aria-label="Página anterior"
+                aria-disabled={page <= 1}
               >
-                ‹ Anterior
+                <PagerIcon name="prev" />
               </Link>
-
-              {pageNumbers.map((p) => (
-                <Link
-                  key={p}
-                  href={buildUrl({ page: p })}
-                  className={`pagination-btn ${p === page ? "active" : ""}`}
-                >
-                  {p}
-                </Link>
-              ))}
-
               <Link
                 href={buildUrl({ page: Math.min(pages, page + 1) })}
-                className={`pagination-btn ${
-                  page >= pages ? "pointer-events-none opacity-40" : ""
-                }`}
+                className={`pager-btn ${page >= pages ? "disabled" : ""}`}
                 title="Próxima página"
+                aria-label="Próxima página"
+                aria-disabled={page >= pages}
               >
-                Próxima ›
+                <PagerIcon name="next" />
               </Link>
               <Link
                 href={buildUrl({ page: pages })}
-                className={`pagination-btn ${
-                  page >= pages ? "pointer-events-none opacity-40" : ""
-                }`}
+                className={`pager-btn ${page >= pages ? "disabled" : ""}`}
                 title="Última página"
+                aria-label="Última página"
+                aria-disabled={page >= pages}
               >
-                »
+                <PagerIcon name="last" />
               </Link>
+
+              <span className="pager-label">Página</span>
+              <PageJump key={page} page={page} pages={pages} onGo={goToPage} />
+              <span className="pager-label">de {pages}</span>
             </nav>
+
+            <label className="pager-size">
+              <span>por página:</span>
+              <select
+                value={size}
+                onChange={(e) =>
+                  router.push(buildUrl({ size: Number(e.target.value), page: 1 }))
+                }
+              >
+                {sizeOptions.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
       )}
     </div>
   );
 }
-

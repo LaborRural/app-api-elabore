@@ -6,21 +6,21 @@ import type { AgroindustryItem, PropertySummaryItem } from "@/lib/api";
 import type { FilterKey } from "@/lib/screens";
 
 const MONTHS = [
-  { value: 1, label: "Janeiro", short: "Jan" },
-  { value: 2, label: "Fevereiro", short: "Fev" },
-  { value: 3, label: "Março", short: "Mar" },
-  { value: 4, label: "Abril", short: "Abr" },
-  { value: 5, label: "Maio", short: "Mai" },
-  { value: 6, label: "Junho", short: "Jun" },
-  { value: 7, label: "Julho", short: "Jul" },
-  { value: 8, label: "Agosto", short: "Ago" },
-  { value: 9, label: "Setembro", short: "Set" },
-  { value: 10, label: "Outubro", short: "Out" },
-  { value: 11, label: "Novembro", short: "Nov" },
-  { value: 12, label: "Dezembro", short: "Dez" },
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
 ];
 
-const YEARS = ["todos", "2026", "2025", "2024", "2023", "2022", "2021", "2020"];
+const YEARS = ["2026", "2025", "2024", "2023", "2022", "2021", "2020"];
 
 type Props = {
   filters: FilterKey[];
@@ -29,59 +29,293 @@ type Props = {
   effectivePropertyId?: string;
 };
 
+type Draft = {
+  ano: string;
+  mes: number[];
+  prop: string;
+  agro: string;
+  ativo: string;
+  consistencia: string;
+};
+
+type Option = { value: string; label: string };
+
+function parseMonths(raw: string) {
+  return raw
+    .split(",")
+    .map((m) => Number(m.trim()))
+    .filter((m) => m >= 1 && m <= 12);
+}
+
+function Chevron() {
+  return (
+    <svg
+      className="sel-chevron"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+/**
+ * Select no padrão Elabore: caixa com chips, botão de limpar e seta; a lista
+ * abre com caixas de seleção e o item marcado fica em verde com um check.
+ * `multiple` define se aceita mais de um valor ou só um (trocar substitui).
+ */
+function SelectBox({
+  label,
+  placeholder,
+  options,
+  values,
+  multiple = false,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  options: Option[];
+  values: string[];
+  multiple?: boolean;
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [term, setTerm] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setTerm("");
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const selected = values
+    .map((v) => options.find((o) => o.value === v))
+    .filter((o): o is Option => Boolean(o));
+
+  const visible = options.filter((o) =>
+    term.trim() ? o.label.toLowerCase().includes(term.trim().toLowerCase()) : true,
+  );
+
+  function toggle(value: string) {
+    if (values.includes(value)) {
+      onChange(values.filter((v) => v !== value));
+    } else {
+      onChange(multiple ? [...values, value] : [value]);
+    }
+    // A lista só fecha ao clicar fora (ver onDocClick), não ao escolher um item.
+  }
+
+  const shown = multiple && selected.length > 2 ? selected.slice(0, 2) : selected;
+  const extra = selected.length - shown.length;
+
+  return (
+    <div className="flt-field" ref={rootRef}>
+      <span className="flt-label">{label}</span>
+      <div
+        className={`sel-box ${open ? "open" : ""}`}
+        onClick={() => {
+          setOpen(true);
+          inputRef.current?.focus();
+        }}
+      >
+        <div className="sel-values">
+          {shown.map((o) => (
+            <span key={o.value} className="sel-chip">
+              <span className="sel-chip-text">{o.label}</span>
+              <button
+                type="button"
+                className="sel-chip-x"
+                aria-label={`Remover ${o.label}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(values.filter((v) => v !== o.value));
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {extra > 0 && <span className="sel-chip sel-chip-more">+{extra}</span>}
+          <input
+            ref={inputRef}
+            className="sel-input"
+            value={term}
+            placeholder={selected.length === 0 ? placeholder : ""}
+            aria-label={label}
+            onChange={(e) => {
+              setTerm(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+          />
+        </div>
+
+        {selected.length > 0 && (
+          <button
+            type="button"
+            className="sel-clear"
+            aria-label={`Limpar ${label}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange([]);
+            }}
+          >
+            ×
+          </button>
+        )}
+        <Chevron />
+      </div>
+
+      {open && (
+        <ul className="sel-list" role="listbox" aria-multiselectable={multiple}>
+          {visible.length === 0 && <li className="sel-empty">Nenhuma opção encontrada</li>}
+          {visible.map((o) => {
+            const checked = values.includes(o.value);
+            return (
+              <li
+                key={o.value}
+                role="option"
+                aria-selected={checked}
+                className={`sel-item ${checked ? "checked" : ""}`}
+                onClick={() => toggle(o.value)}
+              >
+                {checked ? (
+                  <svg
+                    className="sel-check"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m5 12 5 5L20 7" />
+                  </svg>
+                ) : (
+                  <span className="sel-checkbox" aria-hidden="true" />
+                )}
+                <span className="sel-item-text">{o.label}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Campo de busca com debounce (~0,4 s); reinicia pela key quando a URL muda. */
+function SearchBox({
+  initial,
+  onSearch,
+}: {
+  initial: string;
+  onSearch: (q: string) => void;
+}) {
+  const [text, setText] = useState(initial);
+
+  useEffect(() => {
+    if (text.trim() === initial) return;
+    const t = setTimeout(() => onSearch(text.trim()), 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  return (
+    <div className="tb-search">
+      <input
+        type="search"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Buscar..."
+        className="tb-search-input"
+        aria-label="Buscar"
+      />
+      <svg
+        className="tb-search-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+    </div>
+  );
+}
+
 export default function ScreenFilters({
   filters,
   properties,
   agroindustries,
-  effectivePropertyId,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentAno = searchParams.get("ano") ?? "todos";
-  const currentMesRaw = searchParams.get("mes") ?? "";
-  const currentProp = searchParams.get("prop") ?? effectivePropertyId ?? "";
-  const currentAgro = searchParams.get("agro") ?? "";
-  const currentAtivo = searchParams.get("ativo") ?? "";
+  const urlState: Draft = {
+    ano: searchParams.get("ano") ?? "",
+    mes: parseMonths(searchParams.get("mes") ?? ""),
+    prop: searchParams.get("prop") ?? "",
+    agro: searchParams.get("agro") ?? "",
+    ativo: searchParams.get("ativo") ?? "",
+    consistencia: searchParams.get("consistencia") ?? "",
+  };
   const currentQ = searchParams.get("q") ?? "";
-  const currentId = searchParams.get("id") ?? "";
 
-  const [qText, setQText] = useState(currentQ);
-  const [idText, setIdText] = useState(currentId);
-  const [openPopup, setOpenPopup] = useState<string | null>(null);
-  const [propSearch, setPropSearch] = useState("");
-  const [agroSearch, setAgroSearch] = useState("");
-  const [selectedMonths, setSelectedMonths] = useState<number[]>(() =>
-    currentMesRaw
-      .split(",")
-      .map((m) => Number(m.trim()))
-      .filter((m) => m >= 1 && m <= 12),
-  );
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Draft>(urlState);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const showAno = filters.includes("ano");
+  const showMes = filters.includes("mes");
+  const showProp = filters.includes("prop");
+  const showAgro = filters.includes("agro");
+  const showAtivo = filters.includes("ativo");
+  const showConsistencia = filters.includes("consistencia");
+  const hasPanel = showAno || showMes || showProp || showAgro || showAtivo || showConsistencia;
 
-  useEffect(() => {
-    setQText(currentQ);
-  }, [currentQ]);
+  const activeCount =
+    (showAno && urlState.ano ? 1 : 0) +
+    (showMes && urlState.mes.length > 0 ? 1 : 0) +
+    (showProp && urlState.prop ? 1 : 0) +
+    (showAgro && urlState.agro ? 1 : 0) +
+    (showAtivo && urlState.ativo ? 1 : 0) +
+    (showConsistencia && urlState.consistencia ? 1 : 0);
 
-  useEffect(() => {
-    setIdText(currentId);
-  }, [currentId]);
+  function updateParams(updates: Record<string, string | undefined>) {
+    const sp = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([k, v]) => {
+      if (!v || v === "todos") sp.delete(k);
+      else sp.set(k, v);
+    });
+    sp.delete("page");
+    const qs = sp.toString();
+    router.push(`${pathname}${qs ? `?${qs}` : ""}`);
+  }
 
-  useEffect(() => {
-    setSelectedMonths(
-      currentMesRaw
-        .split(",")
-        .map((m) => Number(m.trim()))
-        .filter((m) => m >= 1 && m <= 12),
-    );
-  }, [currentMesRaw]);
-
+  // Fecha o painel ao clicar fora.
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpenPopup(null);
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
       }
     }
     document.addEventListener("mousedown", onDocClick);
@@ -90,173 +324,164 @@ export default function ScreenFilters({
 
   if (filters.length === 0) return null;
 
-  function updateParams(updates: Record<string, string | undefined>) {
-    const sp = new URLSearchParams(searchParams.toString());
-    Object.entries(updates).forEach(([k, v]) => {
-      if (!v || v === "todos") {
-        sp.delete(k);
-      } else {
-        sp.set(k, v);
-      }
+  function togglePanel() {
+    if (!open) setDraft(urlState);
+    setOpen((v) => !v);
+  }
+
+  function apply() {
+    updateParams({
+      ano: showAno ? draft.ano : undefined,
+      mes: showMes && draft.mes.length > 0 ? draft.mes.join(",") : undefined,
+      prop: showProp ? draft.prop : undefined,
+      agro: showAgro ? draft.agro : undefined,
+      ativo: showAtivo ? draft.ativo : undefined,
+      consistencia: showConsistencia ? draft.consistencia : undefined,
     });
-    sp.delete("page"); // volta para página 1 ao filtrar
-    const qs = sp.toString();
-    router.push(`${pathname}${qs ? `?${qs}` : ""}`);
+    setOpen(false);
   }
 
-  function clearAllFilters() {
-    const sp = new URLSearchParams();
-    const aba = searchParams.get("aba");
-    const size = searchParams.get("size");
-    if (aba) sp.set("aba", aba);
-    if (size) sp.set("size", size);
-    const qs = sp.toString();
-    setQText("");
-    setIdText("");
-    setSelectedMonths([]);
-    router.push(`${pathname}${qs ? `?${qs}` : ""}`);
+  function clearAll() {
+    setDraft({ ano: "", mes: [], prop: "", agro: "", ativo: "", consistencia: "" });
+    updateParams({
+      ano: undefined,
+      mes: undefined,
+      prop: undefined,
+      agro: undefined,
+      ativo: undefined,
+      consistencia: undefined,
+    });
+    setOpen(false);
   }
 
-  const hasActiveFilters = Boolean(
-    (currentAno && currentAno !== "todos") ||
-      currentMesRaw ||
-      searchParams.get("prop") ||
-      currentAgro ||
-      currentAtivo ||
-      currentQ ||
-      currentId,
-  );
-
-  // Rótulo do seletor de meses
-  const mesDisplay =
-    selectedMonths.length === 0
-      ? "Todos os meses"
-      : selectedMonths.length <= 3
-        ? selectedMonths
-            .map((m) => MONTHS.find((x) => x.value === m)?.short ?? m)
-            .join(", ")
-        : `${selectedMonths.length} meses selecionados`;
-
-  const selectedPropName =
-    properties.find((p) => p.id_property === currentProp)?.property_name ??
-    "Todas as Propriedades";
-
-  const selectedAgroName =
-    agroindustries.find((a) => a.id_agroindustry === currentAgro)?.name ??
-    "Todas as Agroindústrias";
-
-  const filteredProps = properties.filter((p) => {
-    if (!propSearch.trim()) return true;
-    const term = propSearch.toLowerCase();
-    return (
-      p.property_name.toLowerCase().includes(term) ||
-      (p.city ?? "").toLowerCase().includes(term) ||
-      (p.labor_rural_code ?? "").toLowerCase().includes(term)
-    );
-  });
-
-  const filteredAgros = agroindustries.filter((a) => {
-    if (!agroSearch.trim()) return true;
-    const term = agroSearch.toLowerCase();
-    return (
-      a.name.toLowerCase().includes(term) ||
-      a.razao_social.toLowerCase().includes(term) ||
-      a.cnpj.toLowerCase().includes(term)
-    );
-  });
+  const first = (v: string[]) => v[0] ?? "";
 
   return (
-    <section ref={containerRef} className="filter-bar-card" aria-label="Filtros da tela">
-      {/* FILTRO: ANO */}
-      {filters.includes("ano") && (
-        <div
-          className={`filter-control ${openPopup === "ano" ? "active-popup" : ""}`}
-          style={{ maxWidth: 145 }}
-          onClick={() => setOpenPopup(openPopup === "ano" ? null : "ano")}
-        >
-          <span className="filter-label">Ano</span>
-          <div className="select-display-value">
-            {currentAno === "todos" ? "Todos os anos" : currentAno}
-          </div>
-          {openPopup === "ano" && (
-            <div className="custom-select-popup" onClick={(e) => e.stopPropagation()}>
-              <div className="custom-select-options-list">
-                {YEARS.map((y) => (
-                  <div
-                    key={y}
-                    className={`custom-select-option ${currentAno === y ? "selected" : ""}`}
-                    onClick={() => {
-                      updateParams({ ano: y });
-                      setOpenPopup(null);
-                    }}
-                  >
-                    <span>{y === "todos" ? "Todos os anos" : y}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+    <div ref={wrapRef} className="tb-right" aria-label="Pesquisa e filtros da tela">
+      {filters.includes("q") && (
+        <SearchBox
+          key={currentQ}
+          initial={currentQ}
+          onSearch={(q) => updateParams({ q: q || undefined })}
+        />
       )}
 
-      {/* FILTRO: MÊS (MULTI-SELEÇÃO) */}
-      {filters.includes("mes") && (
-        <div
-          className={`filter-control ${openPopup === "mes" ? "active-popup" : ""}`}
-          style={{ maxWidth: 185 }}
-          onClick={() => setOpenPopup(openPopup === "mes" ? null : "mes")}
-        >
-          <span className="filter-label">Mês (Multi-seleção)</span>
-          <div className="select-display-value">{mesDisplay}</div>
-          {openPopup === "mes" && (
-            <div className="custom-select-popup" onClick={(e) => e.stopPropagation()}>
-              <div className="custom-select-options-list">
-                <div
-                  className={`custom-select-option ${
-                    selectedMonths.length === 0 ? "selected" : ""
-                  }`}
-                  onClick={() => setSelectedMonths([])}
-                >
-                  <span>Todos os meses</span>
-                </div>
-                {MONTHS.map((m) => {
-                  const checked = selectedMonths.includes(m.value);
-                  return (
-                    <div
-                      key={m.value}
-                      className={`custom-select-option ${checked ? "selected" : ""}`}
-                      onClick={() => {
-                        setSelectedMonths((prev) =>
-                          prev.includes(m.value)
-                            ? prev.filter((x) => x !== m.value)
-                            : [...prev, m.value].sort((a, b) => a - b),
-                        );
-                      }}
-                    >
-                      <span>{m.label}</span>
-                      <span className="text-xs font-bold">{checked ? "✓" : ""}</span>
-                    </div>
-                  );
-                })}
+      {hasPanel && (
+        <div className="flt-wrap">
+          <button
+            type="button"
+            className="btn-filtros"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            onClick={togglePanel}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <span>Filtros</span>
+            <span className="btn-filtros-count">{activeCount}</span>
+          </button>
+
+          {open && (
+            <div className="flt-panel" role="dialog" aria-label="Filtros">
+              <div className="flt-grid">
+                {showAno && (
+                  <SelectBox
+                    label="Ano"
+                    placeholder="Filtrar por ano"
+                    options={YEARS.map((y) => ({ value: y, label: y }))}
+                    values={draft.ano ? [draft.ano] : []}
+                    onChange={(v) => setDraft((d) => ({ ...d, ano: first(v) }))}
+                  />
+                )}
+
+                {showMes && (
+                  <SelectBox
+                    label="Mês"
+                    placeholder="Filtrar por mês"
+                    multiple
+                    options={MONTHS.map((name, i) => ({ value: String(i + 1), label: name }))}
+                    values={draft.mes.map(String)}
+                    onChange={(v) =>
+                      setDraft((d) => ({
+                        ...d,
+                        mes: v.map(Number).sort((a, b) => a - b),
+                      }))
+                    }
+                  />
+                )}
+
+                {showAgro && (
+                  <SelectBox
+                    label="Agroindústria"
+                    placeholder="Filtrar por agroindústria"
+                    options={agroindustries.map((a) => ({
+                      value: a.id_agroindustry,
+                      label: a.name,
+                    }))}
+                    values={draft.agro ? [draft.agro] : []}
+                    onChange={(v) => setDraft((d) => ({ ...d, agro: first(v) }))}
+                  />
+                )}
+
+                {showProp && (
+                  <SelectBox
+                    label="Propriedade"
+                    placeholder="Filtrar por propriedade"
+                    options={properties.map((p) => ({
+                      value: p.id_property,
+                      label: p.city
+                        ? `${p.property_name} — ${p.city}/${p.uf ?? ""}`
+                        : p.property_name,
+                    }))}
+                    values={draft.prop ? [draft.prop] : []}
+                    onChange={(v) => setDraft((d) => ({ ...d, prop: first(v) }))}
+                  />
+                )}
+
+                {showAtivo && (
+                  <SelectBox
+                    label="Situação"
+                    placeholder="Filtrar por situação"
+                    options={[
+                      { value: "true", label: "Somente ativos" },
+                      { value: "false", label: "Somente inativos" },
+                    ]}
+                    values={draft.ativo ? [draft.ativo] : []}
+                    onChange={(v) => setDraft((d) => ({ ...d, ativo: first(v) }))}
+                  />
+                )}
+
+                {showConsistencia && (
+                  <SelectBox
+                    label="Consistência"
+                    placeholder="Filtrar por consistência"
+                    options={[
+                      { value: "CONSISTENTE", label: "Consistente" },
+                      { value: "INCONSISTENTE", label: "Inconsistente" },
+                      { value: "OUTLIER", label: "Outlier" },
+                    ]}
+                    values={draft.consistencia ? [draft.consistencia] : []}
+                    onChange={(v) => setDraft((d) => ({ ...d, consistencia: first(v) }))}
+                  />
+                )}
               </div>
-              <div className="mt-2 flex items-center justify-end gap-2 border-t border-[var(--line-soft)] pt-2">
-                <button
-                  type="button"
-                  className="rounded px-2.5 py-1 text-xs font-semibold text-[var(--muted)] hover:bg-[var(--surface-soft)] cursor-pointer"
-                  onClick={() => setSelectedMonths([])}
-                >
-                  Limpar
+
+              <div className="flt-actions">
+                <button type="button" className="flt-clear" onClick={clearAll}>
+                  Limpar filtros
                 </button>
-                <button
-                  type="button"
-                  className="rounded bg-[#0f6e56] px-3 py-1 text-xs font-bold text-white hover:bg-[#004d49] cursor-pointer"
-                  onClick={() => {
-                    updateParams({
-                      mes: selectedMonths.length > 0 ? selectedMonths.join(",") : undefined,
-                    });
-                    setOpenPopup(null);
-                  }}
-                >
+                <button type="button" className="flt-apply" onClick={apply}>
                   Aplicar
                 </button>
               </div>
@@ -264,251 +489,6 @@ export default function ScreenFilters({
           )}
         </div>
       )}
-
-      {/* FILTRO: PROPRIEDADE (COM PESQUISA INTERNA) */}
-      {filters.includes("prop") && (
-        <div
-          className={`filter-control filter-control--wide ${
-            openPopup === "prop" ? "active-popup" : ""
-          }`}
-          onClick={() => setOpenPopup(openPopup === "prop" ? null : "prop")}
-        >
-          <span className="filter-label">Propriedade</span>
-          <div className="select-display-value">{selectedPropName}</div>
-          {openPopup === "prop" && (
-            <div className="custom-select-popup" onClick={(e) => e.stopPropagation()}>
-              <div className="custom-select-search-wrap">
-                <input
-                  type="text"
-                  value={propSearch}
-                  onChange={(e) => setPropSearch(e.target.value)}
-                  placeholder="Pesquisar propriedade ou cidade..."
-                  className="custom-select-search-input"
-                  autoFocus
-                />
-              </div>
-              <div className="custom-select-options-list">
-                <div
-                  className={`custom-select-option ${!currentProp ? "selected" : ""}`}
-                  onClick={() => {
-                    updateParams({ prop: undefined });
-                    setOpenPopup(null);
-                  }}
-                >
-                  <span>Todas as Propriedades ({properties.length})</span>
-                </div>
-                {filteredProps.map((p) => (
-                  <div
-                    key={p.id_property}
-                    className={`custom-select-option ${
-                      currentProp === p.id_property ? "selected" : ""
-                    }`}
-                    onClick={() => {
-                      updateParams({ prop: p.id_property });
-                      setOpenPopup(null);
-                    }}
-                  >
-                    <span className="truncate">{p.property_name}</span>
-                    {p.city && (
-                      <small className="opacity-75 shrink-0">
-                        {p.city}/{p.uf ?? ""}
-                      </small>
-                    )}
-                  </div>
-                ))}
-                {filteredProps.length === 0 && (
-                  <div className="p-3 text-center text-xs italic text-[var(--muted)]">
-                    Nenhuma propriedade encontrada
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* FILTRO: AGROINDÚSTRIA (COM PESQUISA INTERNA) */}
-      {filters.includes("agro") && (
-        <div
-          className={`filter-control filter-control--wide ${
-            openPopup === "agro" ? "active-popup" : ""
-          }`}
-          onClick={() => setOpenPopup(openPopup === "agro" ? null : "agro")}
-        >
-          <span className="filter-label">Agroindústria</span>
-          <div className="select-display-value">{selectedAgroName}</div>
-          {openPopup === "agro" && (
-            <div className="custom-select-popup" onClick={(e) => e.stopPropagation()}>
-              <div className="custom-select-search-wrap">
-                <input
-                  type="text"
-                  value={agroSearch}
-                  onChange={(e) => setAgroSearch(e.target.value)}
-                  placeholder="Pesquisar agroindústria..."
-                  className="custom-select-search-input"
-                  autoFocus
-                />
-              </div>
-              <div className="custom-select-options-list">
-                <div
-                  className={`custom-select-option ${!currentAgro ? "selected" : ""}`}
-                  onClick={() => {
-                    updateParams({ agro: undefined });
-                    setOpenPopup(null);
-                  }}
-                >
-                  <span>Todas as Agroindústrias ({agroindustries.length})</span>
-                </div>
-                {filteredAgros.map((a) => (
-                  <div
-                    key={a.id_agroindustry}
-                    className={`custom-select-option ${
-                      currentAgro === a.id_agroindustry ? "selected" : ""
-                    }`}
-                    onClick={() => {
-                      updateParams({ agro: a.id_agroindustry });
-                      setOpenPopup(null);
-                    }}
-                  >
-                    <span className="truncate">{a.name}</span>
-                    {a.uf && <small className="opacity-75 shrink-0">{a.uf}</small>}
-                  </div>
-                ))}
-                {filteredAgros.length === 0 && (
-                  <div className="p-3 text-center text-xs italic text-[var(--muted)]">
-                    Nenhuma agroindústria encontrada
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* FILTRO: SITUAÇÃO (ATIVO / INATIVO) */}
-      {filters.includes("ativo") && (
-        <div
-          className={`filter-control ${openPopup === "ativo" ? "active-popup" : ""}`}
-          style={{ maxWidth: 150 }}
-          onClick={() => setOpenPopup(openPopup === "ativo" ? null : "ativo")}
-        >
-          <span className="filter-label">Situação</span>
-          <div className="select-display-value">
-            {currentAtivo === "true"
-              ? "Somente Ativos"
-              : currentAtivo === "false"
-                ? "Somente Inativos"
-                : "Todas"}
-          </div>
-          {openPopup === "ativo" && (
-            <div className="custom-select-popup" onClick={(e) => e.stopPropagation()}>
-              <div className="custom-select-options-list">
-                {[
-                  { val: "", label: "Todas as situações" },
-                  { val: "true", label: "Somente Ativos" },
-                  { val: "false", label: "Somente Inativos" },
-                ].map((opt) => (
-                  <div
-                    key={opt.val}
-                    className={`custom-select-option ${currentAtivo === opt.val ? "selected" : ""}`}
-                    onClick={() => {
-                      updateParams({ ativo: opt.val || undefined });
-                      setOpenPopup(null);
-                    }}
-                  >
-                    <span>{opt.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* FILTRO: ID DE LANÇAMENTO (TELA PARCELAS) */}
-      {filters.includes("lancamento") && (
-        <form
-          className="filter-control filter-control--wide"
-          onSubmit={(e) => {
-            e.preventDefault();
-            updateParams({ id: idText.trim() || undefined });
-          }}
-        >
-          <label htmlFor="fltLancamento">ID do Lançamento (opcional)</label>
-          <div className="flex items-center gap-1">
-            <input
-              id="fltLancamento"
-              type="text"
-              value={idText}
-              onChange={(e) => setIdText(e.target.value)}
-              placeholder="Todos do período (ou cole o UUID)..."
-              className="w-full border-0 bg-transparent text-[11.5px] font-semibold text-[var(--ink-strong)] outline-none placeholder:font-normal placeholder:text-[var(--muted)]"
-            />
-            {currentId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIdText("");
-                  updateParams({ id: undefined });
-                }}
-                className="text-xs font-bold text-[var(--muted)] hover:text-[var(--danger)] cursor-pointer"
-                title="Remover filtro de lançamento"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </form>
-      )}
-
-      {/* FILTRO: BUSCA POR TEXTO */}
-      {filters.includes("q") && (
-        <form
-          className="filter-control filter-control--wide"
-          onSubmit={(e) => {
-            e.preventDefault();
-            updateParams({ q: qText.trim() || undefined });
-          }}
-        >
-          <label htmlFor="fltTexto">Busca por texto</label>
-          <div className="flex items-center gap-1">
-            <input
-              id="fltTexto"
-              type="search"
-              value={qText}
-              onChange={(e) => setQText(e.target.value)}
-              placeholder="Digite e pressione Enter..."
-              className="w-full border-0 bg-transparent text-[11.5px] font-semibold text-[var(--ink-strong)] outline-none placeholder:font-normal placeholder:text-[var(--muted)]"
-            />
-            <button
-              type="submit"
-              className="text-[var(--green-800)] hover:text-[var(--green-950)] cursor-pointer"
-              title="Buscar texto"
-              aria-label="Buscar texto"
-            >
-              <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
-                search
-              </span>
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* BOTÃO LIMPAR FILTROS */}
-      {hasActiveFilters && (
-        <button
-          type="button"
-          onClick={clearAllFilters}
-          className="inline-flex h-[38px] items-center gap-1 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-xs font-bold text-[var(--muted)] hover:border-[#fecaca] hover:bg-[#feebe9] hover:text-[#991b1b] cursor-pointer transition-colors"
-          title="Limpar todos os filtros aplicados"
-        >
-          <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
-            filter_alt_off
-          </span>
-          <span>Limpar</span>
-        </button>
-      )}
-    </section>
+    </div>
   );
 }
-

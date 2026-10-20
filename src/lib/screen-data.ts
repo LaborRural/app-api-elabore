@@ -10,6 +10,7 @@ import {
   type QueryParams,
 } from "./api";
 import { getNestedValue, SCREENS, type ColumnDef, type ScreenDef } from "./screens";
+import { getSupabaseTable } from "./supabase";
 
 export type ScreenFilterParams = {
   ano?: string;
@@ -18,6 +19,7 @@ export type ScreenFilterParams = {
   agro?: string;
   ativo?: string; // "true" | "false" | ""
   q?: string;
+  consistencia?: string; // "CONSISTENTE" | "INCONSISTENTE" | "OUTLIER" | ""
   aba?: string;
   id?: string; // ID específico de lançamento para parcelas
   page?: string;
@@ -138,7 +140,8 @@ export async function resolveScreenData(
   }
 
   const forExport = options?.forExport ?? false;
-  const sizeNum = [25, 50, 100].includes(Number(rawParams.size)) ? Number(rawParams.size) : 50;
+  // Tamanhos de página oferecidos na tela ("por página"); padrão 15, como no Elabore.
+  const sizeNum = [15, 20, 30, 40, 50].includes(Number(rawParams.size)) ? Number(rawParams.size) : 15;
   const pageNum = Math.max(1, Number(rawParams.page ?? 1) || 1);
 
   const activeTab = screen.tabs?.find((t) => t.id === rawParams.aba) ?? screen.tabs?.[0];
@@ -378,7 +381,29 @@ export async function resolveScreenData(
       rawRows = instLists.flat();
     }
   }
-  // 4) Fluxo padrão de endpoints paginados
+  // 4) Telas de INDICADORES: tabelas do Supabase, ligadas às propriedades por codigo_lr.
+  // Só entram fazendas cujo código está no catálogo de propriedades do usuário logado,
+  // assim cada agroindústria continua vendo apenas as próprias fazendas.
+  else if (screen.supabaseTable) {
+    const propByCode = new Map<string, PropertySummaryItem>();
+    for (const p of properties) {
+      if (p.labor_rural_code) propByCode.set(p.labor_rural_code.trim().toUpperCase(), p);
+    }
+    const table = await getSupabaseTable(screen.supabaseTable, screen.supabaseOrder ?? "codigo_lr.asc");
+    for (const r of table) {
+      const prop = propByCode.get(String(r.codigo_lr ?? "").trim().toUpperCase());
+      if (!prop) continue;
+      rawRows.push({
+        ...r,
+        // Mês usado pelos filtros Ano/Mês (ver matchesYearAndMonths)
+        reference_month: screen.periodKey ? r[screen.periodKey] : undefined,
+        id_property: prop.id_property,
+        id_agroindustry: prop.id_agroindustry,
+        property_name: prop.property_name,
+      });
+    }
+  }
+  // 5) Fluxo padrão de endpoints paginados
   else if (endpoint) {
     let targetPath = endpoint;
     const query: QueryParams = {};
@@ -476,6 +501,10 @@ export async function resolveScreenData(
   }
   if (selectedYear || selectedMonths.length > 0) {
     rows = rows.filter((r) => matchesYearAndMonths(r, selectedYear, selectedMonths));
+  }
+  if (screen.consistencyKey && rawParams.consistencia) {
+    const key = screen.consistencyKey;
+    rows = rows.filter((r) => String(r[key] ?? "").toUpperCase() === rawParams.consistencia);
   }
   if (rawParams.q?.trim()) {
     const qNorm = normalizeText(rawParams.q.trim());

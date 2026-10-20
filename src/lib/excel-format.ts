@@ -141,7 +141,7 @@ export async function generateStyledXlsxBuffer(
       cell.border = {};
 
       if (cell.value instanceof Date) {
-        cell.numFmt = "dd/mm/yyyy";
+        cell.numFmt = colDef.type === "month" ? "mm/yyyy" : "dd/mm/yyyy";
         cell.alignment = { vertical: "middle", horizontal: "center" };
       } else if (typeof cell.value === "number") {
         if (colDef.type === "currency") {

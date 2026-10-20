@@ -28,6 +28,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ tela: string }>
     agro: sp.get("agro") ?? undefined,
     ativo: sp.get("ativo") ?? undefined,
     q: sp.get("q") ?? undefined,
+    consistencia: sp.get("consistencia") ?? undefined,
     aba: sp.get("aba") ?? undefined,
     id: sp.get("id") ?? undefined,
     sort: sp.get("sort") ?? undefined,

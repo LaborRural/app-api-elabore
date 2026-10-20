@@ -21,8 +21,11 @@ export function formatCellValue(val: unknown, type: ColumnType = "text"): string
 
   switch (type) {
     case "date":
-    case "month":
       return formatDatePtBr(val);
+    case "month": {
+      const m = /^(\d{4})-(\d{2})/.exec(String(val));
+      return m ? `${m[2]}/${m[1]}` : formatDatePtBr(val);
+    }
     case "currency": {
       const n = Number(val);
       if (Number.isNaN(n)) return String(val);

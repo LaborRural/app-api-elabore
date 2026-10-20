@@ -1,19 +1,27 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./toolbar-table.css";
 
 export const metadata: Metadata = {
   title: "Elabore | Labor Rural",
   description: "Sistema de consulta e exportação de dados do Elabore — Labor Rural",
   icons: {
-    icon: "/img/lr.png",
+    icon: [
+      { url: "/img/lr.png", type: "image/png" },
+      { url: "/lr.png", type: "image/png" },
+    ],
     apple: "/img/lr.png",
+    shortcut: "/img/lr.png",
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <link rel="icon" type="image/png" href="/img/lr.png" />
+        <link rel="apple-touch-icon" href="/img/lr.png" />
+        <link rel="shortcut icon" href="/img/lr.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

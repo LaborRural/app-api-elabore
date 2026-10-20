@@ -1,24 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { MENU_GROUPS, SCREEN_LIST } from "@/lib/screens";
+import { NavIcon } from "@/components/nav-icon";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    Cadastros: true,
-    Áreas: true,
-    Lançamentos: true,
-    Controles: true,
-  });
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
+  const currentSlug = pathname.replace(/^\//, "").split("/")[0] || "inicio";
+
+  // Identifica o grupo da tela atual para mantê-lo aberto no accordion
+  const currentScreenDef = SCREEN_LIST.find((s) => s.slug === currentSlug);
+  const initialGroup = currentScreenDef ? currentScreenDef.group : "Cadastros";
+  const [activeGroup, setActiveGroup] = useState<string | null>(initialGroup);
+
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Inicialização do tema
   useEffect(() => {
     const saved = localStorage.getItem("lr_theme") as "light" | "dark" | null;
     const initial =
@@ -28,11 +36,34 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.theme = initial;
   }, []);
 
+  // Fechamento de menus ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Sincroniza grupo ativo quando a rota muda
+  useEffect(() => {
+    if (currentScreenDef) {
+      setActiveGroup(currentScreenDef.group);
+    }
+  }, [currentSlug, currentScreenDef]);
+
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
     localStorage.setItem("lr_theme", next);
     document.documentElement.dataset.theme = next;
+    setUserMenuOpen(false);
+    setMobileMenuOpen(false);
   }
 
   async function handleLogout() {
@@ -41,156 +72,279 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
 
-  const currentSlug = pathname.replace(/^\//, "").split("/")[0] || "inicio";
+  // Lista sequencial para navegação mobile (< bnav >)
+  const navOrder = ["inicio", ...SCREEN_LIST.map((s) => s.slug)];
+  const currentIndex = navOrder.indexOf(currentSlug);
+  const prevSlug = currentIndex > 0 ? navOrder[currentIndex - 1] : null;
+  const nextSlug = currentIndex < navOrder.length - 1 ? navOrder[currentIndex + 1] : null;
+
+  const currentTitle =
+    currentSlug === "inicio"
+      ? "Início"
+      : currentScreenDef?.title || "Elabore";
 
   return (
-    <div
-      className={`elabore-shell ${collapsed ? "sidebar-collapsed" : ""} ${
-        mobileOpen ? "mobile-nav-open" : ""
-      }`}
-    >
-      {/* CABEÇALHO SUPERIOR */}
+    <div className={`elabore-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
+      {/* CABEÇALHO SUPERIOR (PADRÃO CASCA.CSS / FAIXA) */}
       <header className="elabore-header">
-        <div className="elabore-brand">
-          <Link href="/inicio" className="elabore-brand-logo">
-            <img src="/img/elabore_icone.svg" alt="Elabore" />
-            <div className="elabore-brand-title">
+        <div className="hd-marca">
+          <Link href="/inicio" className="logos" title="Início - Labor Rural Elabore">
+            <img src="/img/elabore_icone.svg" alt="Labor Rural" />
+            <h1>
               <span>Labor Rural</span>
               <strong>Elabore Dados</strong>
-            </div>
+            </h1>
           </Link>
 
           <button
             type="button"
-            className="sidebar-toggle-btn"
-            onClick={() => {
-              if (window.innerWidth <= 960) {
-                setMobileOpen((v) => !v);
-              } else {
-                setCollapsed((v) => !v);
-              }
-            }}
+            className="hd-lado"
+            onClick={() => setCollapsed((v) => !v)}
             title={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
             aria-label="Alternar menu lateral"
           >
-            <span className="material-symbols-rounded">
-              {collapsed ? "left_panel_open" : "left_panel_close"}
-            </span>
+            {collapsed ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18, flexShrink: 0 }}>
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <path d="M9 3v18" />
+                <path d="m14 9 3 3-3 3" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18, flexShrink: 0 }}>
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <path d="M9 3v18" />
+                <path d="m16 15-3-3 3-3" />
+              </svg>
+            )}
           </button>
         </div>
 
-        <div className="flex flex-1 items-center justify-between gap-4 pl-2">
-          <div className="hidden sm:flex flex-col">
-            <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--green-700)]">
-              BI LABOR RURAL · PORTAL DE CONSULTA E EXPORTAÇÃO
-            </span>
-            <span className="text-xs font-bold text-[var(--ink-strong)]">
-              Consumo de Dados da API Elabore
-            </span>
+        {/* Informações centrais do cabeçalho */}
+        <div className="hidden sm:flex flex-col pl-2">
+          <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--green-700)]">
+            BI LABOR RURAL · PORTAL DE CONSULTA E EXPORTAÇÃO
+          </span>
+          <span className="text-xs font-bold text-[var(--ink-strong)]">
+            Consumo de Dados da API Elabore
+          </span>
+        </div>
+
+        {/* Lado direito do cabeçalho */}
+        <div className="ml-auto flex items-center gap-3">
+          {/* Chip de Conexão */}
+          <div className="hd-chip" title="Serviço conectado à API do Elabore">
+            <span className="fdot" />
+            <span>API Conectada</span>
           </div>
 
-          <div className="ml-auto flex items-center gap-2.5">
-            <div className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-[#bcead8] bg-[#dff3e9] px-2.5 py-1 text-[10.5px] font-bold text-[#005854]">
-              <span className="h-2 w-2 rounded-full bg-[#0f6e56]" />
-              <span>API Conectada</span>
-            </div>
-
+          {/* Menu Dropdown do Usuário (Desktop) */}
+          <div className="hd-user" ref={userMenuRef}>
             <button
               type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-md border border-[var(--line)] bg-[var(--surface-soft)] text-[var(--ink-strong)] hover:border-[var(--green-400)] hover:bg-[var(--green-100)] cursor-pointer transition-colors"
-              title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
-              aria-label="Alternar tema"
+              className="hd-user-b"
+              onClick={() => setUserMenuOpen((v) => !v)}
+              aria-expanded={userMenuOpen}
+              aria-haspopup="true"
+              title="Menu do usuário"
             >
-              <span className="material-symbols-rounded">
-                {theme === "dark" ? "light_mode" : "dark_mode"}
+              <span className="hd-avatar">LR</span>
+              <span className="hd-user-t">
+                <b>EQUIPE ANALYTICS</b>
+                <small>Consultor / Elabore</small>
               </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex h-[34px] items-center gap-1.5 rounded-md border border-[var(--line)] bg-[var(--surface-soft)] px-3 text-xs font-bold text-[var(--ink-strong)] hover:border-[#fecaca] hover:bg-[#feebe9] hover:text-[#991b1b] cursor-pointer transition-colors"
-              title="Encerrar sessão"
-            >
               <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
-                logout
+                expand_more
               </span>
-              <span>Sair</span>
             </button>
+
+            <div className="hd-menu" hidden={!userMenuOpen} role="menu">
+              <Link
+                href="/inicio"
+                onClick={() => setUserMenuOpen(false)}
+                role="menuitem"
+              >
+                <NavIcon name="inicio" size={17} />
+                <span>Painel Inicial</span>
+              </Link>
+              <button type="button" onClick={toggleTheme} role="menuitem">
+                <span className="material-symbols-rounded" style={{ fontSize: 17 }}>
+                  {theme === "dark" ? "light_mode" : "dark_mode"}
+                </span>
+                <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="hdm-sair"
+                role="menuitem"
+              >
+                <span className="material-symbols-rounded" style={{ fontSize: 17 }}>
+                  logout
+                </span>
+                <span>Sair</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Menu Topo Mobile (<= 860px) */}
+          <div className="hd-menu-wrap" ref={mobileMenuRef}>
+            <button
+              type="button"
+              className={`hd-menu-btn ${mobileMenuOpen ? "ativo" : ""}`}
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              aria-label="Opções do portal"
+              aria-expanded={mobileMenuOpen}
+            >
+              <span className="material-symbols-rounded">menu</span>
+            </button>
+
+            <div
+              className="hd-menu-backdrop"
+              hidden={!mobileMenuOpen}
+              onClick={() => setMobileMenuOpen(false)}
+            />
+
+            <div className="hd-menu-dropdown" hidden={!mobileMenuOpen} role="menu">
+              <div className="hdm-header">
+                <div className="hdm-avatar">LR</div>
+                <div className="hdm-user-info">
+                  <div className="hdm-nome">EQUIPE ANALYTICS</div>
+                  <div className="hdm-papel-tag">Consultor</div>
+                </div>
+              </div>
+
+              <div className="hdm-status-box">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[var(--ink)]">
+                  <span className="fdot" />
+                  <span>API Conectada</span>
+                </div>
+                <span className="text-[10px] font-bold uppercase text-[var(--green-700)]">
+                  Online
+                </span>
+              </div>
+
+              <div className="hdm-acoes">
+                <Link
+                  href="/inicio"
+                  className="hdm-item"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <NavIcon name="inicio" size={17} />
+                  <span>Visão Geral</span>
+                </Link>
+
+                <button type="button" className="hdm-item" onClick={toggleTheme}>
+                  <span className="material-symbols-rounded" style={{ fontSize: 18 }}>
+                    {theme === "dark" ? "light_mode" : "dark_mode"}
+                  </span>
+                  <span>{theme === "dark" ? "Tema claro" : "Tema escuro"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="hdm-item hdm-item--sair"
+                  onClick={handleLogout}
+                >
+                  <span className="material-symbols-rounded" style={{ fontSize: 18 }}>
+                    logout
+                  </span>
+                  <span>Sair</span>
+                </button>
+              </div>
+
+              <div className="hdm-footer">
+                <span>© Labor Rural</span>
+                <span>Versão 1.0.0</span>
+              </div>
+            </div>
           </div>
         </div>
       </header>
 
       {/* CORPO: MENU LATERAL + CONTEÚDO */}
       <div className="elabore-body">
-        <aside className="elabore-sidenav" aria-label="Menu principal do Elabore">
+        <aside className="sidenav" aria-label="Menu principal do Elabore">
+          {/* Item Topo: Início */}
           <Link
             href="/inicio"
-            onClick={() => setMobileOpen(false)}
-            className={`sn-item-top ${currentSlug === "inicio" ? "active" : ""}`}
+            className={`gchip ${currentSlug === "inicio" ? "sel" : ""}`}
             title="Início"
           >
-            <span className="material-symbols-rounded">dashboard</span>
-            <span className="sn-label flex-1">Início</span>
+            <NavIcon name="inicio" size={17} />
+            <span className="gt">Início</span>
           </Link>
 
-          <div className="my-1 h-px bg-[var(--line-soft)]" />
+          <div className="sn-divisor" />
 
+          {/* Grupos Accordion (Padrão abrirGrupoMenu de casca.css: só um aberto por vez) */}
           {MENU_GROUPS.map((group) => {
             const groupScreens = SCREEN_LIST.filter((s) => s.group === group.label);
-            const isOpen = openGroups[group.label] ?? true;
-            const hasActiveChild = groupScreens.some((s) => s.slug === currentSlug);
+            const isOpen = activeGroup === group.label;
 
             return (
-              <div key={group.label} className="flex flex-col">
+              <div
+                key={group.label}
+                className={`sn-grupo ${isOpen ? "aberto" : ""}`}
+              >
                 <button
                   type="button"
                   onClick={() => {
                     if (collapsed) {
                       setCollapsed(false);
-                      setOpenGroups((prev) => ({ ...prev, [group.label]: true }));
+                      setActiveGroup(group.label);
                     } else {
-                      setOpenGroups((prev) => ({
-                        ...prev,
-                        [group.label]: !prev[group.label],
-                      }));
+                      setActiveGroup(isOpen ? null : group.label);
                     }
                   }}
-                  className={`sn-group-btn ${hasActiveChild ? "font-bold" : ""}`}
+                  className="sn-tit"
+                  aria-expanded={isOpen}
                   title={group.label}
                 >
-                  <span className="material-symbols-rounded">{group.icon}</span>
-                  <span className="sn-label flex-1">{group.label}</span>
-                  <span
-                    className="material-symbols-rounded sn-chevron transition-transform"
+                  <NavIcon name={group.label} size={17} />
+                  <span className="sn-nome">{group.label}</span>
+                  <svg
+                    className="sn-chevron"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
                     style={{
-                      fontSize: 16,
-                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      width: 16,
+                      height: 16,
+                      minWidth: 16,
+                      minHeight: 16,
+                      flexShrink: 0,
+                      marginLeft: "auto",
+                      transition: "transform 160ms ease",
                     }}
                   >
-                    expand_more
-                  </span>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
                 </button>
 
                 {isOpen && (
-                  <div className="sn-group-children">
+                  <div className="sn-itens">
                     {groupScreens.map((sc) => {
                       const isActive = currentSlug === sc.slug;
                       return (
                         <Link
                           key={sc.slug}
                           href={`/${sc.slug}`}
-                          onClick={() => setMobileOpen(false)}
-                          className={`sn-subitem ${isActive ? "active" : ""}`}
+                          className={`gchip ${isActive ? "sel" : ""}`}
+                          title={sc.title}
                         >
-                          <span className="truncate">{sc.title}</span>
+                          <span className="gt">{sc.title}</span>
                           {sc.unavailableReason && (
                             <span
-                              className="rounded bg-[var(--surface-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--muted)] border border-[var(--line)]"
+                              className="rounded bg-[var(--panel2)] px-1 py-0.2 text-[8.5px] font-bold text-[var(--muted)] border border-[var(--line-soft)] ml-auto"
                               title="Endpoint ainda não publicado na API"
                             >
-                              Em breve
+                              Breve
                             </span>
                           )}
                         </Link>
@@ -202,33 +356,218 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
 
-          <div className="sn-footer-box mt-auto pt-4">
-            <div className="rounded-lg border border-[var(--line-soft)] bg-[var(--surface-soft)] p-2.5 text-[10.5px] text-[var(--muted)]">
-              <div className="font-bold text-[var(--ink-strong)]">Exportação Padronizada</div>
-              <div className="mt-0.5 leading-snug">
-                Planilhas geradas no padrão oficial <code>excel_format</code> (Aptos 11, cabeçalho
-                verde #247B72 e listrado).
-              </div>
-            </div>
+          <div className="sn-divisor" />
+
+          {/* Botão Sair */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="gchip sn-sair"
+            title="Encerrar sessão"
+          >
+            <svg
+              className="ic-svg"
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              focusable="false"
+              style={{ width: 17, height: 17, minWidth: 17, minHeight: 17, flexShrink: 0 }}
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            <span className="gt">Sair</span>
+          </button>
+
+          {/* Rodapé da Sidebar */}
+          <div className="sn-rodape-versao">
+            <span className="sn-novidades-btn">
+              <svg
+                className="ic-svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                style={{ width: 12, height: 12, minWidth: 12, minHeight: 12, flexShrink: 0 }}
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v4M12 16h.01" />
+              </svg>
+              <span>Elabore API</span>
+            </span>
+            <div className="sn-versao">Versão 1.0.0</div>
           </div>
         </aside>
 
+        {/* Conteúdo Principal */}
         <main className="elabore-main">{children}</main>
       </div>
 
-      {/* RODAPÉ OFICIAL LABOR RURAL */}
+      {/* RODAPÉ OFICIAL (PADRÃO FOOTER.FT / ELABORE) */}
       <footer className="elabore-footer">
         <div className="flex items-center gap-3">
           <img src="/img/logo-branco.png" alt="Labor Rural" />
         </div>
-        <div className="hidden sm:block text-center text-[11px] font-semibold text-white/90">
-          Elabore — Consulta e Exportação de Dados
-        </div>
-        <div className="text-right text-[11px] font-semibold text-white/90">
-          © Labor Rural | 2026 — Departamento de Inteligência
+        <div className="text-right text-[13px] font-semibold text-white/90">
+          © Labor Rural | Departamento de Inteligência | 2026
         </div>
       </footer>
+
+      {/* BARRA INFERIOR DE NAVEGAÇÃO MOBILE (PADRÃO BNAV / MOBILE.CSS) */}
+      <nav className="bnav" aria-label="Navegação entre telas">
+        <button
+          className="bnb"
+          type="button"
+          disabled={!prevSlug}
+          onClick={() => prevSlug && router.push(`/${prevSlug}`)}
+          aria-label="Tela anterior"
+        >
+          &#8249;
+        </button>
+
+        <button
+          className="bnc"
+          type="button"
+          onClick={() => setMobileSheetOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={mobileSheetOpen}
+        >
+          <NavIcon name={currentSlug} size={17} />
+          <span>{currentTitle}</span>
+          <i aria-hidden="true">&#9650;</i>
+        </button>
+
+        <button
+          className="bnb"
+          type="button"
+          disabled={!nextSlug}
+          onClick={() => nextSlug && router.push(`/${nextSlug}`)}
+          aria-label="Próxima tela"
+        >
+          &#8250;
+        </button>
+      </nav>
+
+      {/* FOLHA MODAL MOBILE DE SEÇÕES (PADRÃO FOLHA / MOBILE.CSS) */}
+      <div
+        className="folha"
+        hidden={!mobileSheetOpen}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navegação entre módulos"
+      >
+        <div
+          className="folha-fundo"
+          onClick={() => setMobileSheetOpen(false)}
+        />
+        <div className="folha-cx">
+          <div className="folha-tit">
+            <span>Navegação</span>
+            <button
+              className="folha-x"
+              type="button"
+              onClick={() => setMobileSheetOpen(false)}
+              aria-label="Fechar"
+            >
+              &#10005;
+            </button>
+          </div>
+
+          <div className="folha-b">
+            {/* Atalho Início */}
+            <Link
+              href="/inicio"
+              onClick={() => setMobileSheetOpen(false)}
+              className={`fl-chip ${currentSlug === "inicio" ? "sel" : ""}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <NavIcon name="inicio" size={17} />
+                <span className="gt">Início</span>
+              </div>
+            </Link>
+
+            {/* Grupos com Categorias */}
+            {MENU_GROUPS.map((group) => {
+              const groupScreens = SCREEN_LIST.filter((s) => s.group === group.label);
+              const isOpen = activeGroup === group.label;
+
+              return (
+                <div
+                  key={group.label}
+                  className={`fl-secao-grp ${isOpen ? "" : "colapsado"}`}
+                >
+                  <button
+                    type="button"
+                    className="fl-secao-tit"
+                    onClick={() => setActiveGroup(isOpen ? null : group.label)}
+                  >
+                    <span className="fl-secao-tit-esq">
+                      <span className="fl-secao-ic">
+                        <NavIcon name={group.label} size={17} />
+                      </span>
+                      <span className="fl-secao-tit-txt">{group.label}</span>
+                    </span>
+                    <span className="fl-secao-tit-dir">
+                      <span className="fl-secao-count">{groupScreens.length}</span>
+                      <svg
+                        className="fl-secao-seta"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          flexShrink: 0,
+                          transition: "transform 160ms ease",
+                          transform: isOpen ? "rotate(180deg)" : "none",
+                        }}
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </span>
+                  </button>
+
+                  <div className="fl-secao-col">
+                    {groupScreens.map((sc) => {
+                      const isActive = currentSlug === sc.slug;
+                      return (
+                        <Link
+                          key={sc.slug}
+                          href={`/${sc.slug}`}
+                          onClick={() => setMobileSheetOpen(false)}
+                          className={`fl-chip ${isActive ? "sel" : ""}`}
+                        >
+                          <span className="gt">{sc.title}</span>
+                          {sc.unavailableReason && (
+                            <span className="text-[9px] text-[var(--muted)] ml-auto">
+                              Em breve
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
