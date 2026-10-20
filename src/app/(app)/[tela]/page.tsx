@@ -1,0 +1,72 @@
+import { Suspense } from "react";
+import { notFound, redirect } from "next/navigation";
+import { ApiAuthError } from "@/lib/api";
+import { resolveScreenData, type ScreenFilterParams } from "@/lib/screen-data";
+import { SCREENS } from "@/lib/screens";
+import { getToken } from "@/lib/session";
+import ScreenTable from "@/components/screen-table";
+
+type PageProps = {
+  params: Promise<{ tela: string }>;
+  searchParams: Promise<ScreenFilterParams>;
+};
+
+export default function DynamicScreenPage({ params, searchParams }: PageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="panel-card flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-3 border-[var(--line)] border-t-[#0f6e56]" />
+            <span className="text-xs font-bold text-[var(--green-900)]">
+              Carregando dados da API Elabore…
+            </span>
+          </div>
+        </div>
+      }
+    >
+      <ScreenContent params={params} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function ScreenContent({ params, searchParams }: PageProps) {
+  const { tela } = await params;
+  if (!SCREENS[tela]) {
+    notFound();
+  }
+
+  const token = await getToken();
+  if (!token) {
+    redirect("/login?expired=1");
+  }
+
+  const sp = await searchParams;
+  let data;
+  try {
+    data = await resolveScreenData(token, tela, sp);
+  } catch (err) {
+    if (err instanceof ApiAuthError) {
+      redirect("/login?expired=1");
+    }
+    throw err;
+  }
+
+  return (
+    <ScreenTable
+      screen={data.screen}
+      activeTabId={data.activeTabId}
+      columns={data.columns}
+      rows={data.rows}
+      total={data.total}
+      page={data.page}
+      size={data.size}
+      pages={data.pages}
+      properties={data.properties}
+      agroindustries={data.agroindustries}
+      notice={data.notice}
+      effectivePropertyId={data.effectivePropertyId}
+    />
+  );
+}
+
