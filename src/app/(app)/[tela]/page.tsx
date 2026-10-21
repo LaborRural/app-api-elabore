@@ -1,11 +1,25 @@
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ApiAuthError } from "@/lib/api";
+import { ApiAuthError, getAgroindustriesCatalog, getPropertiesCatalog } from "@/lib/api";
+import { resolvePainelAnual, type PainelAnualData } from "@/lib/painel-anual";
+import { resolvePainelCusto } from "@/lib/painel-custo";
+import { resolvePainelMensal } from "@/lib/painel-mensal";
 import { resolveScreenData, type ScreenFilterParams } from "@/lib/screen-data";
 import { SCREENS } from "@/lib/screens";
 import { getToken, isInternalSession } from "@/lib/session";
+import { buildAreaKpis } from "@/lib/area-kpis";
+import AreaKpiGrid from "@/components/area-kpi-grid";
 import ScreenTable from "@/components/screen-table";
+import PainelAnual from "@/components/painel-anual";
+import PainelCusto from "@/components/painel-custo";
+import PainelMensal from "@/components/painel-mensal";
+
+// Telas de Indicadores que têm a visão "Painel" além da tabela (alternadas pelo submenu lateral).
+const TELAS_COM_PAINEL = new Set(["indicadores-mensais", "indicadores-anuais", "custo-forrageira"]);
+
+// Telas do grupo "Áreas" do menu, que exibem 2 KPIs acima da tabela.
+const AREA_SCREENS = new Set(["areas", "culturas-plantadas", "despesas-culturas"]);
 
 type PageProps = {
   params: Promise<{ tela: string }>;
@@ -45,9 +59,69 @@ async function ScreenContent({ params, searchParams }: PageProps) {
   }
 
   const sp = await searchParams;
+  const internal = await isInternalSession();
+
+  if (tela === "custo-forrageira" && sp.view !== "tabela") {
+    let painel;
+    try {
+      const [properties, agroindustries] = await Promise.all([
+        getPropertiesCatalog(token),
+        getAgroindustriesCatalog(token),
+      ]);
+      painel = { properties, agroindustries, data: await resolvePainelCusto(sp, properties) };
+    } catch (err) {
+      if (err instanceof ApiAuthError) redirect("/login?expired=1");
+      throw err;
+    }
+    return (
+      <PainelCusto
+        data={painel.data}
+        properties={painel.properties}
+        agroindustries={painel.agroindustries}
+        fullSheetHref={internal ? `/api/planilha/forrageira` : undefined}
+      />
+    );
+  }
+
+  if (TELAS_COM_PAINEL.has(tela) && tela !== "custo-forrageira" && sp.view !== "tabela") {
+    let painel;
+    try {
+      const [properties, agroindustries] = await Promise.all([
+        getPropertiesCatalog(token),
+        getAgroindustriesCatalog(token),
+      ]);
+      const data = tela === "indicadores-anuais" ? await resolvePainelAnual(sp, properties) : await resolvePainelMensal(sp, properties);
+      painel = { properties, agroindustries, data };
+    } catch (err) {
+      if (err instanceof ApiAuthError) redirect("/login?expired=1");
+      throw err;
+    }
+    const exportParams = new URLSearchParams({ formato: "xlsx" });
+    if (painel.data.property) exportParams.set("prop", painel.data.property.id_property);
+    if (sp.ano) exportParams.set("ano", sp.ano);
+    if (sp.mes) exportParams.set("mes", sp.mes);
+    const painelProps = {
+      properties: painel.properties,
+      agroindustries: painel.agroindustries,
+      exportHref: painel.data.property ? `/api/export/${tela}?${exportParams.toString()}` : undefined,
+    };
+    if (tela === "indicadores-anuais") {
+      return <PainelAnual data={painel.data as PainelAnualData} {...painelProps} fullSheetHref={internal ? `/api/planilha/annual` : undefined} />;
+    }
+    return <PainelMensal data={painel.data} {...painelProps} fullSheetHref={internal ? `/api/planilha/monthly` : undefined} />;
+  }
+
+  // KPIs do grupo "Áreas": calculados sobre todos os registros filtrados (não só a página).
+  const comKpis = AREA_SCREENS.has(tela);
   let data;
+  let kpis;
   try {
-    data = await resolveScreenData(token, tela, sp);
+    const [pageData, allData] = await Promise.all([
+      resolveScreenData(token, tela, sp),
+      comKpis ? resolveScreenData(token, tela, sp, { forExport: true }) : Promise.resolve(null),
+    ]);
+    data = pageData;
+    if (allData) kpis = buildAreaKpis(tela, allData);
   } catch (err) {
     if (err instanceof ApiAuthError) {
       redirect("/login?expired=1");
@@ -68,12 +142,9 @@ async function ScreenContent({ params, searchParams }: PageProps) {
       properties={data.properties}
       agroindustries={data.agroindustries}
       notice={data.notice}
+      kpis={kpis && kpis.length > 0 ? <AreaKpiGrid kpis={kpis} /> : undefined}
       effectivePropertyId={data.effectivePropertyId}
-      fullSheetHref={
-        data.screen.elabore && (await isInternalSession())
-          ? `/api/planilha/${data.screen.elabore.fullSheet}`
-          : undefined
-      }
+      fullSheetHref={data.screen.elabore && internal ? `/api/planilha/${data.screen.elabore.fullSheet}` : undefined}
     />
   );
 }

@@ -1,0 +1,441 @@
+/* Painel da fazenda (Indicadores Mensais) */
+
+.painel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.painel-farm {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-strong);
+}
+.painel-farm small {
+  display: block;
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.painel-section-title {
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #014945;
+}
+:root[data-theme="dark"] .painel-section-title,
+:root[data-tema="escuro"] .painel-section-title {
+  color: var(--green-800);
+}
+
+.painel-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); /* produção ocupa 2/3 da linha e custo por litro 1/3 */
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .painel-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.painel-charts--half {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 900px) {
+  .painel-charts--half {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.painel-facet {
+  margin-top: 8px;
+}
+.painel-facet-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--ink);
+}
+.painel-facet-name {
+  font-weight: 700;
+}
+.painel-facet-name small {
+  font-weight: 500;
+  color: var(--muted);
+}
+.painel-facet-avg {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.painel-facet-note {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.painel-chart-wide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.painel-chip {
+  align-self: flex-start;
+}
+
+.painel-chart-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--ink-strong);
+}
+.painel-chart-head p {
+  margin: 0;
+  font-size: 11.2px;
+  font-style: italic;
+  color: var(--muted);
+}
+.legend-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 2px;
+}
+.painel-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.painel-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.painel-pivot th.group-row,
+.painel-pivot td.group-row {
+  background: var(--green-100);
+  color: var(--ink-strong);
+  font-weight: 800;
+  text-align: left;
+}
+.painel-pivot td.avg,
+.painel-pivot th.avg {
+  border-left: 2px solid var(--line);
+  font-weight: 700;
+}
+.painel-pivot th.sticky-label,
+.painel-pivot td.sticky-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  text-align: left;
+  min-width: 260px;
+}
+
+/* Cabeçalho e rodapé só do relatório impresso */
+.painel-print-only {
+  display: none;
+}
+
+/* Impressão: relatório em A4 paisagem, sem menus, cabeçalho nem rodapé do app */
+@page {
+  size: A4 landscape;
+  margin: 10mm 0 18mm;
+}
+
+/* Cobre a tela enquanto o layout é ajustado para a impressão (evita o "pulo" visível) */
+:root.painel-printing body::after {
+  content: "Preparando impressão…";
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas, #f5f7f6);
+  color: #004d49;
+  font-size: 15px;
+  font-weight: 700;
+}
+@media print {
+  :root.painel-printing body::after {
+    display: none !important;
+  }
+}
+
+/* Layout fixo na largura da página (297mm = 1123px) enquanto a impressão é preparada */
+:root.painel-printing .elabore-header,
+:root.painel-printing .sidenav,
+:root.painel-printing .elabore-footer,
+:root.painel-printing .bnav {
+  display: none !important;
+}
+:root.painel-printing .elabore-body {
+  padding: 0 !important;
+}
+:root.painel-printing .elabore-main {
+  margin: 0 !important;
+  width: 1123px !important;
+  max-width: 1123px !important;
+  padding: 0 38px !important;
+  box-sizing: border-box;
+}
+:root.painel-printing .lancamentos-filtro-bar,
+:root.painel-printing .painel-config {
+  display: none !important;
+}
+@media print {
+  html,
+  body {
+    height: auto !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .painel-print-hide,
+  .elabore-header,
+  .sidenav,
+  .elabore-sidenav,
+  .elabore-footer,
+  .bnav,
+  .folha,
+  .lancamentos-filtro-bar,
+  .painel-config,
+  .painel-status {
+    display: none !important;
+  }
+  .elabore-body {
+    padding: 0 !important;
+    display: block !important;
+  }
+  .elabore-main {
+    margin: 0 !important;
+    padding: 0 12mm !important;
+    box-sizing: border-box;
+    min-height: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: #ffffff !important;
+    gap: 10px !important;
+  }
+
+  :root.painel-printing .elabore-main {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 12mm !important;
+  }
+  /* qualquer coisa mais larga que a página faz o Chrome encolher tudo e deixar o conteúdo à esquerda */
+  .elabore-shell,
+  .elabore-body,
+  .elabore-main {
+    overflow: hidden !important;
+    max-width: 100% !important;
+  }
+  .summary-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+  .summary-card {
+    padding: 8px 12px !important;
+    min-height: 0 !important;
+    gap: 4px !important;
+    border-radius: 12px !important;
+  }
+  .painel-print-only {
+    display: block;
+  }
+  .painel-print-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #004d49;
+  }
+  .painel-print-head h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #004d49;
+  }
+  .painel-print-head p {
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: #475569;
+  }
+  .painel-print-head img {
+    height: 42px;
+    width: auto;
+  }
+  .painel-print-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: -12mm;
+    padding: 0 12mm;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #64748b;
+  }
+
+  /* o título da tela já está no cabeçalho do relatório */
+  .painel-head {
+    display: none !important;
+  }
+
+  /* blocos inteiros, sem cortar gráficos/cartões entre páginas */
+  .painel-section-title {
+    font-size: 14px !important;
+    margin-top: 4px !important;
+  }
+  .painel-chart,
+  .painel-chart-wide,
+  .painel-facet,
+  .summary-card,
+  .panel-card,
+  .painel-dinamico > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .painel-section-title {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .summary-grid {
+    gap: 8px !important;
+  }
+  .painel-charts,
+  .painel-charts--half {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .painel-dinamico {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .panel-card {
+    box-shadow: none !important;
+  }
+  svg {
+    max-width: 100%;
+  }
+
+  /* tabela de indicadores: começa em página nova e repete o cabeçalho */
+  .painel-pivot-title {
+    padding: 0 8mm;
+    margin-top: 8px !important;
+  }
+  .painel-pivot {
+    padding: 0 8mm;
+    box-sizing: border-box;
+    overflow: hidden !important;
+    max-width: 100% !important;
+    max-height: none !important;
+  }
+  .painel-pivot table {
+    width: 100% !important;
+    table-layout: auto;
+  }
+  .painel-pivot thead {
+    display: table-header-group;
+  }
+  .painel-pivot tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .painel-pivot th,
+  .painel-pivot td {
+    font-size: 9px !important;
+    padding: 4px 6px !important;
+    white-space: nowrap;
+    border: 0 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+  .painel-pivot thead th {
+    background: #004d49 !important;
+    color: #ffffff !important;
+  }
+  .painel-pivot tbody tr:nth-child(even) td:not(.group-row) {
+    background: #f6faf9 !important;
+  }
+  .painel-pivot td.avg {
+    background: #eaf4f1 !important;
+  }
+  .painel-pivot th.sticky-label,
+  .painel-pivot td.sticky-label {
+    position: static !important;
+    min-width: 0 !important;
+    white-space: normal;
+  }
+  .painel-pivot th.group-row,
+  .painel-pivot td.group-row {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  .painel-pivot details:not([open]) > * {
+    display: block !important;
+  }
+}
+
+/* Gráfico dinâmico: gráfico à esquerda, configuração à direita */
+.painel-dinamico {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .painel-dinamico {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.painel-config h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--ink-strong);
+}
+.painel-config fieldset {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.painel-config legend {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.painel-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.painel-radio input {
+  margin-top: 2px;
+  accent-color: #0f6e56;
+}

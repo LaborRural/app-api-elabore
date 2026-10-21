@@ -1,0 +1,431 @@
+/* Painel de custos de forrageira (espelha a tela 7 do BI gerencial) */
+
+.painel-custo.is-pending {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.pc-filtros {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+/* Os três filtros têm a mesma largura e altura; nomes longos de produto são cortados com reticências */
+.pc-filtros .flt-field {
+  flex: none;
+  width: 220px;
+}
+.pc-filtros .sel-box {
+  height: 34px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.pc-filtros .sel-chip {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.pc-filtros .sel-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink);
+}
+.pc-chip .material-symbols-rounded {
+  font-size: 18px;
+  color: #0f6e56;
+}
+
+.pc-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid #f3d9a4;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #8a5a00;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pc-aviso--info {
+  border-color: #bae6fd;
+  background: #e7f3fb;
+  color: #176695;
+}
+.pc-aviso .material-symbols-rounded {
+  flex: none;
+}
+
+.pc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1000px) {
+  .pc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pc-painel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px 6px;
+}
+.pc-painel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pc-painel-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--ink-strong);
+}
+.pc-painel-head p {
+  margin: 0;
+  font-size: 11.2px;
+  font-style: italic;
+  color: var(--muted);
+}
+.btn-pill {
+  flex: none;
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid #0f6e56;
+  border-radius: 999px;
+  background: var(--surface);
+  color: #0f6e56;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-pill:hover:not(:disabled) {
+  background: #eaf6f3;
+}
+.btn-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Sistema de plantio */
+.pc-sistema {
+  display: grid;
+  grid-template-columns: minmax(200px, 270px) minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+@media (max-width: 640px) {
+  .pc-sistema {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.pc-legenda {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pc-legenda li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.pc-legenda li:last-child {
+  border-bottom: 0;
+}
+.pc-legenda i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.pc-legenda b {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink-strong);
+}
+.pc-legenda small {
+  display: block;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.pc-legenda strong {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink-strong);
+}
+.pc-destaque {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: #eaf6f3;
+  color: #0f6e56;
+}
+.pc-destaque strong {
+  font-size: 22px;
+  font-weight: 800;
+}
+.pc-destaque small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+}
+.pc-destaque span:not(.material-symbols-rounded) {
+  font-size: 11.5px;
+  color: var(--ink);
+}
+
+/* Custos: R$/ha e R$/t lado a lado */
+.pc-custo-duplo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+@media (max-width: 800px) {
+  .pc-custo-duplo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.pc-mini {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.pc-mini b {
+  color: var(--ink-strong);
+}
+
+/* Composição do custo por etapa */
+.pc-comp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0 2px;
+}
+.pc-comp-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.pc-comp-legenda i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 2px;
+}
+.pc-comp-linha {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .pc-comp-linha {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+.pc-comp-nome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pc-comp-nome i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.pc-comp-nome b {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-strong);
+}
+.pc-comp-nome small {
+  display: block;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.pc-comp-trilho {
+  height: 34px;
+}
+.pc-comp-barra {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.pc-comp-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.pc-comp-total {
+  text-align: right;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-strong);
+}
+.pc-comp-nota {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.pc-rodape {
+  margin: 2px 0 8px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Tabelas de resumo */
+.pc-tabela {
+  padding: 10px 14px 8px;
+}
+.pc-tabela-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.pc-tabela-head h3 {
+  margin: 0;
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--ink-strong);
+}
+.pc-tabela .record-count {
+  font-size: 11px;
+  color: var(--muted);
+}
+.pc-table th {
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pc-table thead tr.table-filter-row th {
+  cursor: default;
+}
+.pc-table .col-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.pc-table .col-center {
+  text-align: center;
+}
+.pc-table td {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc-table tfoot td {
+  font-weight: 800;
+  border-top: 1px solid var(--line);
+}
+.pc-sort {
+  margin-left: 4px;
+  font-size: 9px;
+  font-style: normal;
+  color: #a1a1aa;
+}
+.pc-sort.on {
+  color: #014945;
+}
+.pc-table .empty-cell {
+  padding: 18px;
+  text-align: center;
+  color: var(--muted);
+}
+.pc-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.pc-pager select {
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 11.5px;
+}
+.pc-pager-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pc-pager-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pc-pager-item em {
+  font-style: normal;
+}
+.pc-pager-btns button {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.pc-pager-btns button.on {
+  border-color: #09695e;
+  background: #09695e;
+  color: #fff;
+}
+.pc-pager-btns button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* As tabelas começam abaixo da dobra: ao abrir, só os gráficos aparecem */
+.pc-primeira-secao {
+  margin-top: 56px;
+}
+
+/* Chip e campo de busca ficam na mesma linha: o chip encolhe (com reticências) e o campo cede espaço */
+.pc-filtros .sel-values {
+  flex-wrap: nowrap;
+}
+.pc-filtros .sel-input {
+  flex: 1 1 8px;
+  min-width: 8px;
+  width: 8px;
+}
