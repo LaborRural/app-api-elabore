@@ -24,6 +24,10 @@ type Props = {
   effectivePropertyId?: string;
   /** Download da planilha completa do SharePoint (só equipe Labor Rural, telas de Indicadores). */
   fullSheetHref?: string;
+  /** Conteúdo extra no cabeçalho (ex.: alternador Tabela/Painel). */
+  headerExtra?: React.ReactNode;
+  /** Cards de KPI exibidos entre as abas e a barra de ferramentas. */
+  kpis?: React.ReactNode;
 };
 
 /** Setas de ordenação empilhadas (↑ sobre ↓); a direção ativa fica escura. */
@@ -123,6 +127,8 @@ export default function ScreenTable({
   notice,
   effectivePropertyId,
   fullSheetHref,
+  headerExtra,
+  kpis,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -177,9 +183,12 @@ export default function ScreenTable({
   return (
     <div className="flex flex-col gap-3">
       {/* CABEÇALHO DA TELA + SELETOR DE ABAS */}
-      <div>
-        <h1 className="page-title">{screen.title}</h1>
-        {screen.subtitle && <p className="page-subtitle">{screen.subtitle}</p>}
+      <div className="flex flex-wrap items-start justify-between gap-2.5">
+        <div>
+          <h1 className="page-title">{screen.title}</h1>
+          {screen.subtitle && <p className="page-subtitle">{screen.subtitle}</p>}
+        </div>
+        {headerExtra}
       </div>
 
       {/* ABAS SUBLINHADAS (quando a tela possui mais de um endpoint) */}
@@ -197,6 +206,8 @@ export default function ScreenTable({
           ))}
         </nav>
       )}
+
+      {kpis}
 
       {/* BARRA: EXPORTAR (esquerda) · BUSCA + FILTROS (direita) */}
       {!screen.unavailableReason && (
@@ -266,8 +277,9 @@ export default function ScreenTable({
                 <tr>
                   {columns.map((col) => {
                     const isSorted = currentSort === col.key;
-                    const alignClass =
-                      col.align === "right"
+                    const alignClass = screen.elabore
+                      ? "text-center"
+                      : col.align === "right"
                         ? "text-right"
                         : col.align === "center"
                           ? "text-center"
@@ -392,10 +404,12 @@ export default function ScreenTable({
                       }
 
                       const formatted = formatCellValue(raw, col.type);
+                      // Texto longo (critérios violados, detalhamento…) aparece inteiro, quebrando linha
+                      const wrap = formatted.length > 40 || col.key === "observation";
                       return (
                         <td
                           key={col.key}
-                          className={`${alignClass} ${
+                          className={`${alignClass} ${wrap ? "cell-wrap" : ""} ${
                             col.key === "property_name" || col.key === "name"
                               ? "font-semibold text-[var(--ink-strong)]"
                               : ""

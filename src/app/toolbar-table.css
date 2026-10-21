@@ -190,6 +190,18 @@
   min-width: 0;
 }
 
+.flt-field-wide {
+  grid-column: 1 / -1;
+}
+
+/* Campo largo: o nome da fazenda aparece inteiro, quebrando em mais de uma linha se precisar. */
+.flt-field-wide .sel-chip-text {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .flt-label {
   font-size: 12px;
   font-weight: 600;
@@ -370,7 +382,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 18px;
-  margin-top: 14px;
+  margin-bottom: 14px;
 }
 
 .flt-clear {
@@ -655,4 +667,252 @@
 
 a.btn-table-export {
   text-decoration: none;
+}
+
+/* ---------- Cards de KPI (summary-card.tsx) ---------- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .summary-grid {
+    grid-template-columns: repeat(var(--summary-cols, 5), minmax(0, 1fr));
+  }
+}
+
+.summary-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 12px 14px;
+  overflow: hidden;
+  border: 1px solid #0f6e56;
+  border-radius: 16px;
+  background: #0f6e56;
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(13, 148, 136, 0.22);
+}
+
+.summary-card::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -10px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-50%);
+}
+
+.summary-card--vertical {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 90px;
+}
+
+@media (min-width: 768px) {
+  .summary-card {
+    min-height: 64px;
+    padding: 14px 18px;
+    border-radius: 18px;
+  }
+
+  .summary-card--vertical {
+    min-height: 96px;
+    padding: 14px 16px;
+  }
+}
+
+.summary-card-icon,
+.summary-card-body,
+.summary-card-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.summary-card-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 18px;
+}
+
+.summary-card--vertical .summary-card-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.summary-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summary-card--vertical .summary-card-body {
+  width: 100%;
+}
+
+.summary-card-label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.summary-card-label,
+.summary-card-value,
+.summary-card-unit,
+.summary-card-subtext {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.summary-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.summary-card-value {
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-card--vertical .summary-card-value {
+  font-size: 15px;
+}
+
+.summary-card-unit {
+  font-size: 12px;
+  color: #e6fffa;
+}
+
+.summary-card-subtext {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.summary-card-delta {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.summary-card-delta--positive {
+  color: #c6f6d5;
+}
+
+.summary-card-delta--negative {
+  color: #fed7d7;
+}
+
+.summary-card-delta--neutral {
+  color: #e6fffa;
+}
+
+/* Ícone de info com dica (data-tip) */
+.summary-card-info {
+  position: relative;
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: help;
+}
+
+.summary-card-info:hover::after,
+.summary-card-info:focus-visible::after {
+  content: attr(data-tip);
+  position: fixed;
+  z-index: 50;
+  max-width: 260px;
+  margin-top: 22px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(0, 77, 73, 0.94);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.summary-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.summary-card-action {
+  width: 104px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+}
+
+.summary-card-action:hover {
+  background: rgba(255, 255, 255, 0.42);
+  border-color: rgba(255, 255, 255, 0.84);
+}
+
+.summary-card-action:active {
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.summary-card-action:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Texto longo: mostra todo o conteúdo em várias linhas em vez de cortar */
+.data-table td.cell-wrap {
+  min-width: 280px;
+  max-width: 480px;
+  height: auto;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  vertical-align: top;
 }

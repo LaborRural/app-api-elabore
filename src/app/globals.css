@@ -1081,6 +1081,39 @@ svg.ic-svg.ic-cheio {
   min-width: 16px;
 }
 
+/* Tela com submenus (ex.: Indicadores Mensais → Painel / Tabela) */
+.sn-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sn-sub-tit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  padding: 5px 8px;
+  font-size: 11.2px;
+  font-weight: 400;
+  color: var(--cinza-1000);
+}
+/* Nos submenus, só o item selecionado fica em negrito (sem destaque no hover) */
+.sn-itens .sn-sub-item:hover:not(.sel),
+.fl-secao-col .sn-sub-item:hover:not(.sel) {
+  font-weight: 400 !important;
+}
+.sn-sub-soon {
+  opacity: 0.6;
+  cursor: default;
+}
+.sn-sub-item {
+  padding-left: 20px !important;
+}
+
 .sn-divisor {
   height: 1px;
   background: var(--line-soft);
