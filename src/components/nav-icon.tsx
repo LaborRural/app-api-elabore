@@ -28,7 +28,7 @@ export function NavIcon({ name, className, size = 17 }: NavIconProps) {
     case "visão geral":
       return (
         <svg
-          className={`${cls} ic-cheio`}
+          className={cls}
           width={size}
           height={size}
           style={iconStyle}
@@ -36,7 +36,8 @@ export function NavIcon({ name, className, size = 17 }: NavIconProps) {
           aria-hidden="true"
           focusable="false"
         >
-          <path d="M11.03 2.59a1.501 1.501 0 0 1 1.94 0l7.5 6.363a1.5 1.5 0 0 1 .53 1.144V19.5a1.5 1.5 0 0 1-1.5 1.5h-5.75a.75.75 0 0 1-.75-.75V14h-2v6.25a.75.75 0 0 1-.75.75H4.5A1.5 1.5 0 0 1 3 19.5v-9.403c0-.44.194-.859.53-1.144ZM12 3.734l-7.5 6.363V19.5h5v-6.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v6.25h5v-9.403Z" />
+          <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+          <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         </svg>
       );
 
@@ -51,10 +52,11 @@ export function NavIcon({ name, className, size = 17 }: NavIconProps) {
           aria-hidden="true"
           focusable="false"
         >
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          <path d="M11 12H3" />
+          <path d="M16 6H3" />
+          <path d="M16 18H3" />
+          <path d="M18 9v6" />
+          <path d="M21 12h-6" />
         </svg>
       );
 
@@ -70,9 +72,10 @@ export function NavIcon({ name, className, size = 17 }: NavIconProps) {
           aria-hidden="true"
           focusable="false"
         >
-          <polygon points="12 2 2 7 12 12 22 7 12 2" />
-          <polyline points="2 17 12 22 22 17" />
-          <polyline points="2 12 12 17 22 12" />
+          <path d="m12 8 6-3-6-3v10" />
+          <path d="m8 11.99-5.5 3.14a1 1 0 0 0 0 1.74l8.5 4.86a2 2 0 0 0 2 0l8.5-4.86a1 1 0 0 0 0-1.74L16 12" />
+          <path d="m6.49 12.85 11.02 6.3" />
+          <path d="M17.51 12.85 6.5 19.15" />
         </svg>
       );
 
@@ -88,9 +91,9 @@ export function NavIcon({ name, className, size = 17 }: NavIconProps) {
           aria-hidden="true"
           focusable="false"
         >
-          <rect width="18" height="18" x="3" y="3" rx="2" />
-          <path d="M12 8v8" />
-          <path d="m8 12 4 4 4-4" />
+          <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+          <path d="M12 10v6" />
+          <path d="m9 13 3 3 3-3" />
         </svg>
       );
 

@@ -2,9 +2,27 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MENU_GROUPS, SCREEN_LIST } from "@/lib/screens";
 import { NavIcon } from "@/components/nav-icon";
+
+// Telas com mais de uma visão: aparecem no menu como um título com submenus.
+// "soon" marca visões ainda não publicadas (aparecem sem link, com selo "Breve").
+type SubItem = { label: string; href: string; view: "painel" | "tabela"; soon?: boolean };
+const SUBMENUS: Record<string, SubItem[]> = {
+  "indicadores-mensais": [
+    { label: "Painel da fazenda", href: "/indicadores-mensais", view: "painel" },
+    { label: "Tabela de indicadores", href: "/indicadores-mensais?view=tabela", view: "tabela" },
+  ],
+  "indicadores-anuais": [
+    { label: "Painel anual", href: "/indicadores-anuais", view: "painel" },
+    { label: "Tabela de médias", href: "/indicadores-anuais?view=tabela", view: "tabela" },
+  ],
+  "custo-forrageira": [
+    { label: "Painel de custos", href: "/custo-forrageira", view: "painel" },
+    { label: "Tabela de custos", href: "/custo-forrageira?view=tabela", view: "tabela" },
+  ],
+};
 
 export default function AppShell({
   children,
@@ -18,6 +36,8 @@ export default function AppShell({
   const userPapel = user?.papel ?? "Consultor";
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const viewParam = searchParams.get("view");
 
   const [collapsed, setCollapsed] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -32,15 +52,17 @@ export default function AppShell({
   const initialGroup = currentScreenDef ? currentScreenDef.group : "Cadastros";
   const [activeGroup, setActiveGroup] = useState<string | null>(initialGroup);
 
+  // Submenu aberto (um por vez): começa na tela atual, se ela tiver submenus.
+  const [openSub, setOpenSub] = useState<string | null>(SUBMENUS[currentSlug] ? currentSlug : null);
+
   const userMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // Inicialização do tema
   useEffect(() => {
     const saved = localStorage.getItem("lr_theme") as "light" | "dark" | null;
-    const initial =
-      saved ??
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    // Tema claro é o padrão; o escuro só vale se o usuário o escolheu no menu.
+    const initial = saved ?? "light";
     setTheme(initial);
     document.documentElement.dataset.theme = initial;
   }, []);
@@ -66,6 +88,10 @@ export default function AppShell({
     }
   }, [currentSlug, currentScreenDef]);
 
+  useEffect(() => {
+    if (SUBMENUS[currentSlug]) setOpenSub(currentSlug);
+  }, [currentSlug]);
+
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -86,6 +112,21 @@ export default function AppShell({
   const currentIndex = navOrder.indexOf(currentSlug);
   const prevSlug = currentIndex > 0 ? navOrder[currentIndex - 1] : null;
   const nextSlug = currentIndex < navOrder.length - 1 ? navOrder[currentIndex + 1] : null;
+
+  // Só o Painel da fazenda existe por enquanto; nas demais telas a visão ativa é sempre a tabela.
+  const currentView = (currentSlug === "indicadores-mensais" || currentSlug === "indicadores-anuais" || currentSlug === "custo-forrageira") && viewParam !== "tabela" ? "painel" : "tabela";
+
+  // Fazenda, período e agroindústria escolhidos seguem junto ao alternar entre Painel e Tabela.
+  function subHref(sub: SubItem) {
+    const [path, query = ""] = sub.href.split("?");
+    const qs = new URLSearchParams(query);
+    for (const key of ["prop", "ano", "mes", "agro"]) {
+      const v = searchParams.get(key);
+      if (v) qs.set(key, v);
+    }
+    const out = qs.toString();
+    return out ? `${path}?${out}` : path;
+  }
 
   const currentTitle =
     currentSlug === "inicio"
@@ -340,6 +381,44 @@ export default function AppShell({
                   <div className="sn-itens">
                     {groupScreens.map((sc) => {
                       const isActive = currentSlug === sc.slug;
+                      const subs = SUBMENUS[sc.slug];
+                      const subOpen = openSub === sc.slug;
+                      if (subs) {
+                        return (
+                          <div key={sc.slug} className="sn-sub">
+                            <button
+                              type="button"
+                              className="sn-sub-tit"
+                              aria-expanded={subOpen}
+                              onClick={() => setOpenSub(subOpen ? null : sc.slug)}
+                            >
+                              <span>{sc.title}</span>
+                              <svg className="sn-sub-seta" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 14, height: 14, flexShrink: 0, transition: "transform 160ms ease", transform: subOpen ? "rotate(180deg)" : "none" }}>
+                                <path d="m6 9 6 6 6-6" />
+                              </svg>
+                            </button>
+                            {subOpen && subs.map((sub) =>
+                              sub.soon ? (
+                                <span key={sub.view} className="gchip sn-sub-item sn-sub-soon" title="Ainda não publicado">
+                                  <span className="gt">{sub.label}</span>
+                                  <span className="rounded bg-[var(--panel2)] px-1 py-0.2 text-[8.5px] font-bold text-[var(--muted)] border border-[var(--line-soft)] ml-auto">
+                                    Breve
+                                  </span>
+                                </span>
+                              ) : (
+                                <Link
+                                  key={sub.view}
+                                  href={subHref(sub)}
+                                  className={`gchip sn-sub-item ${isActive && currentView === sub.view ? "sel" : ""}`}
+                                  title={`${sc.title} · ${sub.label}`}
+                                >
+                                  <span className="gt">{sub.label}</span>
+                                </Link>
+                              ),
+                            )}
+                          </div>
+                        );
+                      }
                       return (
                         <Link
                           key={sc.slug}
@@ -554,6 +633,42 @@ export default function AppShell({
                   <div className="fl-secao-col">
                     {groupScreens.map((sc) => {
                       const isActive = currentSlug === sc.slug;
+                      const subs = SUBMENUS[sc.slug];
+                      const subOpen = openSub === sc.slug;
+                      if (subs) {
+                        return (
+                          <div key={sc.slug} className="sn-sub">
+                            <button
+                              type="button"
+                              className="sn-sub-tit"
+                              aria-expanded={subOpen}
+                              onClick={() => setOpenSub(subOpen ? null : sc.slug)}
+                            >
+                              <span>{sc.title}</span>
+                              <svg className="sn-sub-seta" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 14, height: 14, flexShrink: 0, transition: "transform 160ms ease", transform: subOpen ? "rotate(180deg)" : "none" }}>
+                                <path d="m6 9 6 6 6-6" />
+                              </svg>
+                            </button>
+                            {subOpen && subs.map((sub) =>
+                              sub.soon ? (
+                                <span key={sub.view} className="fl-chip sn-sub-item sn-sub-soon">
+                                  <span className="gt">{sub.label}</span>
+                                  <span className="text-[9px] text-[var(--muted)] ml-auto">Em breve</span>
+                                </span>
+                              ) : (
+                                <Link
+                                  key={sub.view}
+                                  href={subHref(sub)}
+                                  onClick={() => setMobileSheetOpen(false)}
+                                  className={`fl-chip sn-sub-item ${isActive && currentView === sub.view ? "sel" : ""}`}
+                                >
+                                  <span className="gt">{sub.label}</span>
+                                </Link>
+                              ),
+                            )}
+                          </div>
+                        );
+                      }
                       return (
                         <Link
                           key={sc.slug}

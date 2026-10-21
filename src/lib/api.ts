@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
 import { getToken } from "./session";
+import { getProducerNames } from "./supabase";
 
 export type Page<T> = {
   items?: T[];
@@ -127,6 +128,8 @@ export type PropertySummaryItem = {
   is_approved: boolean;
   labor_rural_code: string | null;
   agroindustry_code: string | null;
+  /** Nome do produtor (vem das tabelas de indicadores, por código LR); ausente se a fazenda não tem indicadores. */
+  producer_name?: string | null;
 };
 
 export type AgroindustryItem = {
@@ -174,18 +177,70 @@ async function cachedCatalog<T>(token: string, path: string, maxPages: number): 
   return (await load) as T[];
 }
 
-/** Busca catálogo de propriedades para enriquecer nomes e popular filtro. */
-export async function getPropertiesCatalog(token?: string): Promise<PropertySummaryItem[]> {
+/**
+ * Catálogo de propriedades com o motivo da falha (timeout, 5xx…) em vez de lista vazia silenciosa,
+ * para a tela poder avisar que os nomes podem estar incompletos.
+ */
+export async function getPropertiesCatalogChecked(
+  token?: string,
+): Promise<{ items: PropertySummaryItem[]; error?: string }> {
   try {
-    if (token) {
-      return await cachedCatalog<PropertySummaryItem>(token, "/properties", 10);
-    }
-    const { items } = await fetchAllPages<PropertySummaryItem>("/properties", {}, 10);
-    return items;
+    const [items, producers] = await Promise.all([
+      token
+        ? cachedCatalog<PropertySummaryItem>(token, "/properties", 10)
+        : fetchAllPages<PropertySummaryItem>("/properties", {}, 10).then((r) => r.items),
+      getProducerNames(),
+    ]);
+    return {
+      items: items.map((p) => {
+        const producer = p.labor_rural_code ? producers.get(p.labor_rural_code.trim().toUpperCase()) : undefined;
+        return producer ? { ...p, producer_name: producer } : p;
+      }),
+    };
   } catch (err) {
     if (err instanceof ApiAuthError) throw err;
-    return [];
+    return { items: [], error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/** Busca catálogo de propriedades para enriquecer nomes e popular filtro. */
+export async function getPropertiesCatalog(token?: string): Promise<PropertySummaryItem[]> {
+  return (await getPropertiesCatalogChecked(token)).items;
+}
+
+// Nomes de propriedades fora do catálogo, resolvidos por /property/{id} (null = não encontrada).
+const propertyNameCache = new Map<string, { name: string | null; expiresAt: number }>();
+
+/** Resolve nomes de propriedades que não estão no catálogo, consultando /property/{id}. */
+export async function resolvePropertyNames(
+  token: string,
+  ids: string[],
+): Promise<Map<string, string>> {
+  const tokenKey = createHash("sha256").update(token).digest("hex");
+  const found = new Map<string, string>();
+  const toFetch: string[] = [];
+  for (const id of ids) {
+    const hit = propertyNameCache.get(`${tokenKey}|${id}`);
+    if (hit && Date.now() < hit.expiresAt) {
+      if (hit.name) found.set(id, hit.name);
+    } else {
+      toFetch.push(id);
+    }
+  }
+  await Promise.all(
+    toFetch.slice(0, 30).map(async (id) => {
+      let name: string | null = null;
+      try {
+        const d = await apiGetWithToken<{ property_name?: string }>(token, `/property/${id}`);
+        name = d.property_name ?? null;
+      } catch (err) {
+        if (err instanceof ApiAuthError) throw err;
+      }
+      propertyNameCache.set(`${tokenKey}|${id}`, { name, expiresAt: Date.now() + CATALOG_TTL_MS });
+      if (name) found.set(id, name);
+    }),
+  );
+  return found;
 }
 
 /** Busca catálogo de agroindústrias para popular filtro. */

@@ -38,7 +38,7 @@ type Draft = {
   consistencia: string;
 };
 
-type Option = { value: string; label: string };
+export type Option = { value: string; label: string };
 
 function parseMonths(raw: string) {
   return raw
@@ -69,12 +69,13 @@ function Chevron() {
  * abre com caixas de seleção e o item marcado fica em verde com um check.
  * `multiple` define se aceita mais de um valor ou só um (trocar substitui).
  */
-function SelectBox({
+export function SelectBox({
   label,
   placeholder,
   options,
   values,
   multiple = false,
+  wide = false,
   onChange,
 }: {
   label: string;
@@ -82,6 +83,8 @@ function SelectBox({
   options: Option[];
   values: string[];
   multiple?: boolean;
+  /** Ocupa a linha inteira do painel e deixa o nome selecionado quebrar em vez de cortar. */
+  wide?: boolean;
   onChange: (values: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -121,7 +124,7 @@ function SelectBox({
   const extra = selected.length - shown.length;
 
   return (
-    <div className="flt-field" ref={rootRef}>
+    <div className={`flt-field${wide ? " flt-field-wide" : ""}`} ref={rootRef}>
       <span className="flt-label">{label}</span>
       <div
         className={`sel-box ${open ? "open" : ""}`}
@@ -394,6 +397,15 @@ export default function ScreenFilters({
 
           {open && (
             <div className="flt-panel" role="dialog" aria-label="Filtros">
+              <div className="flt-actions">
+                <button type="button" className="flt-clear" onClick={clearAll}>
+                  Limpar filtros
+                </button>
+                <button type="button" className="flt-apply" onClick={apply}>
+                  Aplicar
+                </button>
+              </div>
+
               <div className="flt-grid">
                 {showAno && (
                   <SelectBox
@@ -438,11 +450,10 @@ export default function ScreenFilters({
                   <SelectBox
                     label="Propriedade"
                     placeholder="Filtrar por propriedade"
+                    wide
                     options={properties.map((p) => ({
                       value: p.id_property,
-                      label: p.city
-                        ? `${p.property_name} — ${p.city}/${p.uf ?? ""}`
-                        : p.property_name,
+                      label: p.producer_name ? `${p.property_name} - ${p.producer_name}` : p.property_name,
                     }))}
                     values={draft.prop ? [draft.prop] : []}
                     onChange={(v) => setDraft((d) => ({ ...d, prop: first(v) }))}
@@ -475,15 +486,6 @@ export default function ScreenFilters({
                     onChange={(v) => setDraft((d) => ({ ...d, consistencia: first(v) }))}
                   />
                 )}
-              </div>
-
-              <div className="flt-actions">
-                <button type="button" className="flt-clear" onClick={clearAll}>
-                  Limpar filtros
-                </button>
-                <button type="button" className="flt-apply" onClick={apply}>
-                  Aplicar
-                </button>
               </div>
             </div>
           )}

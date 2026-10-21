@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { TbEye, TbEyeOff, TbHelp } from "react-icons/tb";
 
 // Mosaico inclinado: poucas colunas de fotos grandes e nítidas, escurecidas
 // por uma única camada verde (referência: login do Elabore em produção).
@@ -102,17 +103,7 @@ export default function LoginForm() {
           rel="noopener noreferrer"
           className="flex items-center gap-2 text-white/95 hover:text-white text-base sm:text-lg font-bold tracking-wide transition-colors"
         >
-          <svg
-            className="w-6 h-6 text-white/95"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
+          <TbHelp className="w-[18px] h-[18px] text-white/95" aria-hidden="true" />
           <span>Precisa de ajuda?</span>
         </a>
       </header>
@@ -201,36 +192,7 @@ export default function LoginForm() {
                     aria-label={showPassword ? "Ocultar a senha" : "Mostrar a senha"}
                     className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-[#64748b] hover:text-[#004d49] rounded-md transition-colors"
                   >
-                    {showPassword ? (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M3 3l18 18" />
-                        <path d="M10.6 5.1A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.5 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4-.9" />
-                        <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="18"
-                        height="18"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                    )}
+                    {showPassword ? <TbEyeOff size={18} aria-hidden="true" /> : <TbEye size={18} aria-hidden="true" />}
                   </button>
                 </div>
                 <div className="mt-2">
@@ -280,7 +242,7 @@ export default function LoginForm() {
 
       {/* Bottom Footer: Copyright */}
       <footer className="absolute bottom-6 right-6 md:right-10 z-20 text-sm sm:text-base text-white/90 font-medium tracking-wide">
-        © Labor Rural | 2026
+        © Labor Rural | <span suppressHydrationWarning>{new Date().getFullYear()}</span>
       </footer>
     </div>
   );
