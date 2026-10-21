@@ -44,6 +44,25 @@ export type ScreenTabDef = {
 
 export type MenuGroup = "Cadastros" | "Áreas" | "Lançamentos" | "Controles" | "Indicadores";
 
+export type ElaboreSourceDef = {
+  /** Tabela no schema elabore. */
+  table: string;
+  /** Coluna com o código LR/PRO, ligada ao labor_rural_code das propriedades da API. */
+  codeColumn: string;
+  /** Ordenação padrão PostgREST (ex.: "labor_rural_code.asc,reference_month.desc"). */
+  order: string;
+  /** Coluna usada pelos filtros Ano/Mês: mês (timestamp) ou janela anual "Abr/25-Mar/26". */
+  period?: { column: string; kind: "month" | "annual_window" };
+  /** Coluna usada pelo filtro "consistencia". */
+  consistencyColumn?: string;
+  /** Colunas de texto pesquisadas pela busca. */
+  searchColumns: string[];
+  /** Colunas repetidas em todas as abas de grupo (identificam a linha). */
+  fixedColumns: string[];
+  /** Planilha completa no SharePoint (botão só para a equipe Labor Rural). */
+  fullSheet: "monthly" | "annual" | "forrageira";
+};
+
 export type ScreenDef = {
   slug: string;
   group: MenuGroup;
@@ -60,14 +79,8 @@ export type ScreenDef = {
   supportsActive?: boolean;
   unavailableReason?: string;
   notice?: string;
-  /** Tabela do Supabase lida no lugar da API Elabore (ligada às propriedades por codigo_lr). */
-  supabaseTable?: string;
-  /** Ordenação PostgREST da leitura (ex.: "codigo_lr.asc,mes_elabore.desc"). */
-  supabaseOrder?: string;
-  /** Coluna de mês usada pelos filtros Ano/Mês nas telas do Supabase. */
-  periodKey?: string;
-  /** Coluna usada pelo filtro "consistencia". */
-  consistencyKey?: string;
+  /** Tela lida do schema "elabore" do Supabase (colunas vêm do dim_dicionario_colunas). */
+  elabore?: ElaboreSourceDef;
   columns: ColumnDef[];
   tabs?: ScreenTabDef[];
 };
@@ -604,102 +617,64 @@ export const SCREENS: Record<string, ScreenDef> = {
     slug: "indicadores-mensais",
     group: "Indicadores",
     title: "Indicadores Mensais",
-    subtitle: "Consistência mensal dos indicadores lançados no Elabore por fazenda",
+    subtitle: "Indicadores mensais e consistência dos lançamentos no Elabore por fazenda",
     code: "ELB-IND-01",
     icon: "calendar_month",
     exportName: "indicadores_mensais",
     filters: ["ano", "mes", "prop", "agro", "consistencia", "q"],
-    supabaseTable: "elabore_raw_consistencia_mensal",
-    supabaseOrder: "codigo_lr.asc,mes_elabore.desc",
-    periodKey: "mes_elabore",
-    consistencyKey: "consistencia_mensal",
-    notice:
-      "Dados do Supabase (elabore_raw_consistencia_mensal). Ano e Mês filtram pelo Mês Elabore (competência).",
-    columns: [
-      { key: "codigo_lr", label: "Cód. LR", type: "text", align: "center" },
-      { key: "nome_produtor", label: "Produtor / Fazenda", type: "text" },
-      { key: "agroindustry_name", label: "Agroindústria", type: "text" },
-      { key: "nome_consultor", label: "Consultor", type: "text" },
-      { key: "mes_elabore", label: "Mês Elabore", type: "month", align: "center" },
-      { key: "mes_referencia", label: "Mês Referência", type: "month", align: "center" },
-      { key: "status_code", label: "Status Cadastro", type: "text", align: "center" },
-      { key: "consistencia_mensal", label: "Consistência", type: "consistencia", align: "center" },
-      { key: "detalhamento_inconsistencia", label: "Detalhamento", type: "text" },
-    ],
+    elabore: {
+      table: "raw_indicadores_mensais",
+      fullSheet: "monthly",
+      codeColumn: "labor_rural_code",
+      order: "labor_rural_code.asc,reference_month.desc",
+      period: { column: "reference_month", kind: "month" },
+      consistencyColumn: "consistency_status",
+      searchColumns: ["property_entrepreneur_label", "labor_rural_code", "consultant_name", "agroindustry_name"],
+      fixedColumns: ["labor_rural_code", "property_entrepreneur_label", "reference_month", "consistency_status"],
+    },
+    columns: [],
   },
 
   "indicadores-anuais": {
     slug: "indicadores-anuais",
     group: "Indicadores",
     title: "Indicadores Anuais",
-    subtitle: "Janela de 12 meses: produção, receita, COE e margem bruta por fazenda",
+    subtitle: "Cálculo de médias da janela móvel de 12 meses por fazenda",
     code: "ELB-IND-02",
     icon: "date_range",
     exportName: "indicadores_anuais",
     filters: ["ano", "mes", "prop", "agro", "consistencia", "q"],
-    supabaseTable: "elabore_raw_consistencia_anual",
-    supabaseOrder: "codigo_lr.asc,mes_referencia.desc",
-    periodKey: "mes_referencia",
-    consistencyKey: "consistencia_anual",
-    notice:
-      "Dados do Supabase (elabore_raw_consistencia_anual). Cada linha acumula a janela de 12 meses do Início ao Fim; Ano e Mês filtram pelo Fim da Janela.",
-    columns: [
-      { key: "codigo_lr", label: "Cód. LR", type: "text", align: "center" },
-      { key: "nome_produtor", label: "Produtor / Fazenda", type: "text" },
-      { key: "agroindustry_name", label: "Agroindústria", type: "text" },
-      { key: "nome_consultor", label: "Consultor", type: "text" },
-      { key: "mes_elabore", label: "Início da Janela", type: "month", align: "center" },
-      { key: "mes_referencia", label: "Fim da Janela", type: "month", align: "center" },
-      { key: "consistencia_anual", label: "Consistência", type: "consistencia", align: "center" },
-      { key: "producao_anual_litros", label: "Produção Anual (L)", type: "integer", align: "right" },
-      { key: "receita_atividade_litro_anual", label: "Receita/L (R$)", type: "currency", align: "right" },
-      { key: "coe_litro_anual", label: "COE/L (R$)", type: "currency", align: "right" },
-      { key: "margem_bruta_litro_anual", label: "Margem Bruta/L (R$)", type: "currency", align: "right" },
-      { key: "margem_bruta_anual", label: "Margem Bruta Anual (R$)", type: "currency", align: "right" },
-      { key: "detalhamento_inconsistencia", label: "Detalhamento", type: "text" },
-    ],
+    elabore: {
+      table: "raw_indicadores_anuais",
+      fullSheet: "annual",
+      codeColumn: "labor_rural_code",
+      order: "labor_rural_code.asc,id.asc",
+      period: { column: "annual_period", kind: "annual_window" },
+      consistencyColumn: "annual_consistency_status",
+      searchColumns: ["property_entrepreneur_label", "labor_rural_code", "consultant_name", "agroindustry_name"],
+      fixedColumns: ["labor_rural_code", "property_entrepreneur_label", "annual_period", "annual_consistency_status"],
+    },
+    columns: [],
   },
 
   "custo-forrageira": {
     slug: "custo-forrageira",
     group: "Indicadores",
     title: "Custo de Forrageira",
-    subtitle: "Custo da base forrageira por área, cultura e safra (nominal e deflacionado)",
+    subtitle: "Custo por produção da base forrageira (nominal e deflacionado)",
     code: "ELB-IND-03",
     icon: "grass",
     exportName: "custo_forrageira",
     filters: ["prop", "agro", "q"],
-    supabaseTable: "elabore_raw_custo_forrageira",
-    supabaseOrder: "codigo_lr.asc,safra.desc,area.asc",
-    notice:
-      "Dados do Supabase (elabore_raw_custo_forrageira). Use a busca para filtrar por safra, cultura ou área.",
-    columns: [
-      { key: "codigo_lr", label: "Cód. LR", type: "text", align: "center" },
-      { key: "nome_propriedade", label: "Propriedade", type: "text" },
-      { key: "nome_produtor", label: "Produtor", type: "text" },
-      { key: "agroindustry_name", label: "Agroindústria", type: "text" },
-      { key: "consultor_elabore", label: "Consultor", type: "text" },
-      { key: "safra", label: "Safra", type: "text", align: "center" },
-      { key: "ciclo", label: "Ciclo", type: "text", align: "center" },
-      { key: "area", label: "Área", type: "text" },
-      { key: "cultura", label: "Cultura", type: "text" },
-      { key: "produto_colhido", label: "Produto Colhido", type: "text" },
-      { key: "categoria", label: "Categoria", type: "text", align: "center" },
-      { key: "sistema_plantio", label: "Sistema de Plantio", type: "text" },
-      { key: "data_plantio", label: "Plantio", type: "date", align: "center" },
-      { key: "data_colheita", label: "Colheita", type: "date", align: "center" },
-      { key: "area_plantada_ha", label: "Área Plantada (ha)", type: "number", align: "right" },
-      { key: "area_colhida_ha", label: "Área Colhida (ha)", type: "number", align: "right" },
-      { key: "quantidade_kg", label: "Quantidade (kg)", type: "integer", align: "right" },
-      { key: "custo_pre_plantio_nom", label: "Pré-plantio (R$)", type: "currency", align: "right" },
-      { key: "custo_plantio_nom", label: "Plantio (R$)", type: "currency", align: "right" },
-      { key: "custo_tratos_nom", label: "Tratos (R$)", type: "currency", align: "right" },
-      { key: "custo_colheita_planta_inteira_nom", label: "Colheita Planta Inteira (R$)", type: "currency", align: "right" },
-      { key: "custo_colheita_grao_nom", label: "Colheita Grão (R$)", type: "currency", align: "right" },
-      { key: "custo_etapa_nao_informada_nom", label: "Etapa Não Informada (R$)", type: "currency", align: "right" },
-      { key: "custo_total_nom", label: "Custo Total Nominal (R$)", type: "currency", align: "right" },
-      { key: "custo_total_defl", label: "Custo Total Deflacionado (R$)", type: "currency", align: "right" },
-    ],
+    elabore: {
+      table: "raw_custo_forrageira",
+      fullSheet: "forrageira",
+      codeColumn: "labor_rural_code",
+      order: "property_name.asc,area_name.asc,harvest_season.desc",
+      searchColumns: ["property_name", "producer_name", "labor_rural_code", "culture_name", "area_name", "harvest_season"],
+      fixedColumns: ["labor_rural_code", "property_name", "area_name", "culture_name", "harvest_season"],
+    },
+    columns: [],
   },
 };
 

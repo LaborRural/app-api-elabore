@@ -3,7 +3,7 @@ import "./globals.css";
 import "./toolbar-table.css";
 
 export const metadata: Metadata = {
-  title: "Elabore | Labor Rural",
+  title: "API Elabore | Labor Rural",
   description: "Sistema de consulta e exportação de dados do Elabore — Labor Rural",
   icons: {
     icon: [

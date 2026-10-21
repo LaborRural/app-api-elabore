@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiBase } from "@/lib/api";
-import { setSession } from "@/lib/session";
+import { isInternalEmail, setSession } from "@/lib/session";
 
 export async function POST(req: Request) {
   try {
@@ -17,7 +17,12 @@ export async function POST(req: Request) {
         { status: 401 },
       );
     }
-    await setSession(body.access_token);
+    const mail = String(email ?? "");
+    const nome = body.name ?? body.nome ?? body.user?.name ?? body.user?.nome;
+    await setSession(body.access_token, isInternalEmail(mail), {
+      email: mail,
+      name: typeof nome === "string" ? nome : undefined,
+    });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

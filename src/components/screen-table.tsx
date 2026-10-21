@@ -22,6 +22,8 @@ type Props = {
   agroindustries: AgroindustryItem[];
   notice?: string;
   effectivePropertyId?: string;
+  /** Download da planilha completa do SharePoint (só equipe Labor Rural, telas de Indicadores). */
+  fullSheetHref?: string;
 };
 
 /** Setas de ordenação empilhadas (↑ sobre ↓); a direção ativa fica escura. */
@@ -120,6 +122,7 @@ export default function ScreenTable({
   agroindustries,
   notice,
   effectivePropertyId,
+  fullSheetHref,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -204,6 +207,19 @@ export default function ScreenTable({
               disabled={exporting !== null}
               exportingFormat={exporting}
             />
+            {fullSheetHref && (
+              <a
+                href={fullSheetHref}
+                download
+                className="btn-table-export"
+                title="Baixa a última planilha gerada pelo lr-indicadores-elabore, com todas as abas e todas as fazendas"
+              >
+                <span className="material-symbols-rounded" style={{ fontSize: 17 }}>
+                  cloud_download
+                </span>
+                <span>Planilha completa</span>
+              </a>
+            )}
           </div>
 
           <ScreenFilters
@@ -282,7 +298,7 @@ export default function ScreenTable({
 
               <tbody>
                 {filteredRows.map((row, rIdx) => (
-                  <tr key={String(row.id_property ?? row.id ?? rIdx)}>
+                  <tr key={`${String(row.id ?? row.id_property ?? "")}-${rIdx}`}>
                     {columns.map((col) => {
                       const raw = getNestedValue(row, col.key);
                       const alignClass =

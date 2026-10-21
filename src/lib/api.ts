@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { redirect } from "next/navigation";
 import { getToken } from "./session";
 
@@ -141,12 +142,43 @@ export type AgroindustryItem = {
   created_at: string;
 };
 
+// Catálogos (propriedades e agroindústrias) mudam pouco e a API leva de 6 a 16 s por página:
+// ficam em memória por usuário (chave = hash do token) e as páginas 2+ são pedidas em paralelo.
+const CATALOG_TTL_MS = 10 * 60 * 1000;
+const catalogCache = new Map<string, { items: unknown[]; expiresAt: number }>();
+const catalogInFlight = new Map<string, Promise<unknown[]>>();
+
+async function cachedCatalog<T>(token: string, path: string, maxPages: number): Promise<T[]> {
+  const key = `${createHash("sha256").update(token).digest("hex")}|${path}`;
+  const hit = catalogCache.get(key);
+  if (hit && Date.now() < hit.expiresAt) return hit.items as T[];
+  const pending = catalogInFlight.get(key);
+  if (pending) return (await pending) as T[];
+
+  const load = (async () => {
+    const first = await apiGetWithToken<Page<T>>(token, path, { page: 1, size: 100 });
+    const pages = Math.min(first.pages ?? 1, maxPages);
+    const rest = await Promise.all(
+      Array.from({ length: Math.max(0, pages - 1) }, (_, i) =>
+        apiGetWithToken<Page<T>>(token, path, { page: i + 2, size: 100 }),
+      ),
+    );
+    const items = [first, ...rest].flatMap((p) => p.items ?? p.data ?? []);
+    catalogCache.set(key, { items, expiresAt: Date.now() + CATALOG_TTL_MS });
+    if (catalogCache.size > 200) {
+      for (const [k, v] of catalogCache) if (Date.now() >= v.expiresAt) catalogCache.delete(k);
+    }
+    return items;
+  })().finally(() => catalogInFlight.delete(key));
+  catalogInFlight.set(key, load);
+  return (await load) as T[];
+}
+
 /** Busca catálogo de propriedades para enriquecer nomes e popular filtro. */
 export async function getPropertiesCatalog(token?: string): Promise<PropertySummaryItem[]> {
   try {
     if (token) {
-      const { items } = await fetchAllPagesWithToken<PropertySummaryItem>(token, "/properties", {}, 10);
-      return items;
+      return await cachedCatalog<PropertySummaryItem>(token, "/properties", 10);
     }
     const { items } = await fetchAllPages<PropertySummaryItem>("/properties", {}, 10);
     return items;
@@ -160,8 +192,7 @@ export async function getPropertiesCatalog(token?: string): Promise<PropertySumm
 export async function getAgroindustriesCatalog(token?: string): Promise<AgroindustryItem[]> {
   try {
     if (token) {
-      const { items } = await fetchAllPagesWithToken<AgroindustryItem>(token, "/agroindustry", {}, 5);
-      return items;
+      return await cachedCatalog<AgroindustryItem>(token, "/agroindustry", 5);
     }
     const { items } = await fetchAllPages<AgroindustryItem>("/agroindustry", {}, 5);
     return items;

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import {
   ApiAuthError,
   apiGetWithToken,
@@ -37,6 +38,8 @@ export default function InicioPage({ searchParams }: SearchProps) {
 }
 
 async function InicioContent({ searchParams }: SearchProps) {
+  // Dados sempre por requisição: o cache em memória dos catálogos (api.ts) lê o relógio.
+  await connection();
   const token = await getToken();
   if (!token) redirect("/login?expired=1");
 

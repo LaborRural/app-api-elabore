@@ -637,3 +637,22 @@
     padding-bottom: 72px;
   }
 }
+
+/* Rolagem vertical e horizontal dentro da área da tabela: a altura é limitada à janela,
+   então a barra horizontal fica no rodapé visível (e não depois da última linha).
+   O cabeçalho continua fixo (th sticky). Barras com contraste: o verde-claro sobre
+   trilho transparente herdado do globals.css ficava quase invisível. */
+.table-scroll {
+  overflow: auto;
+  max-height: max(320px, calc(100vh - var(--header-h) - var(--footer-h) - 230px));
+  scrollbar-width: auto;
+  scrollbar-color: #7a9a93 #eef2f1;
+}
+
+[data-theme="dark"] .table-scroll {
+  scrollbar-color: #5f7d77 #1d2624;
+}
+
+a.btn-table-export {
+  text-decoration: none;
+}

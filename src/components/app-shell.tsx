@@ -6,7 +6,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { MENU_GROUPS, SCREEN_LIST } from "@/lib/screens";
 import { NavIcon } from "@/components/nav-icon";
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({
+  children,
+  user,
+}: {
+  children: React.ReactNode;
+  user?: { nome: string; iniciais: string; papel: string } | null;
+}) {
+  const userNome = user?.nome ?? "Usuário";
+  const userIniciais = user?.iniciais ?? "LR";
+  const userPapel = user?.papel ?? "Consultor";
   const pathname = usePathname();
   const router = useRouter();
 
@@ -147,10 +156,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               aria-haspopup="true"
               title="Menu do usuário"
             >
-              <span className="hd-avatar">LR</span>
+              <span className="hd-avatar">{userIniciais}</span>
               <span className="hd-user-t">
-                <b>EQUIPE ANALYTICS</b>
-                <small>Consultor / Elabore</small>
+                <b>{userNome}</b>
+                <small>{userPapel}</small>
               </span>
               <span className="material-symbols-rounded" style={{ fontSize: 16 }}>
                 expand_more
@@ -206,10 +215,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="hd-menu-dropdown" hidden={!mobileMenuOpen} role="menu">
               <div className="hdm-header">
-                <div className="hdm-avatar">LR</div>
+                <div className="hdm-avatar">{userIniciais}</div>
                 <div className="hdm-user-info">
-                  <div className="hdm-nome">EQUIPE ANALYTICS</div>
-                  <div className="hdm-papel-tag">Consultor</div>
+                  <div className="hdm-nome">{userNome}</div>
+                  <div className="hdm-papel-tag">{userPapel}</div>
                 </div>
               </div>
 

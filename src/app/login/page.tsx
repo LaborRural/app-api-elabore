@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import LoginForm from "./login-form";
 
 export const metadata: Metadata = {
-  title: "Login · Elabore",
+  title: "API Elabore | Labor Rural",
   description: "Acesse o sistema Elabore — Labor Rural",
   icons: {
     icon: [

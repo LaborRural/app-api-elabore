@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
+import { connection } from "next/server";
 import { ApiAuthError } from "@/lib/api";
 import { resolveScreenData, type ScreenFilterParams } from "@/lib/screen-data";
 import { SCREENS } from "@/lib/screens";
-import { getToken } from "@/lib/session";
+import { getToken, isInternalSession } from "@/lib/session";
 import ScreenTable from "@/components/screen-table";
 
 type PageProps = {
@@ -31,6 +32,8 @@ export default function DynamicScreenPage({ params, searchParams }: PageProps) {
 }
 
 async function ScreenContent({ params, searchParams }: PageProps) {
+  // Dados sempre por requisição: os caches em memória de api.ts/supabase.ts leem o relógio.
+  await connection();
   const { tela } = await params;
   if (!SCREENS[tela]) {
     notFound();
@@ -66,6 +69,11 @@ async function ScreenContent({ params, searchParams }: PageProps) {
       agroindustries={data.agroindustries}
       notice={data.notice}
       effectivePropertyId={data.effectivePropertyId}
+      fullSheetHref={
+        data.screen.elabore && (await isInternalSession())
+          ? `/api/planilha/${data.screen.elabore.fullSheet}`
+          : undefined
+      }
     />
   );
 }

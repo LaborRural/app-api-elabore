@@ -1,14 +1,32 @@
 import "server-only";
+import type { ColumnDef, ColumnType } from "./screens";
 
-// Leitura somente das tabelas do Supabase (lr-analytics-db) via PostgREST.
+// Leitura somente do schema "elabore" do Supabase (lr-analytics-db) via PostgREST.
+// As tabelas são gravadas pelo notebook do lr-indicadores-elabore (functions/supabase_utils.py).
 // A chave fica só no servidor; o navegador nunca fala com o Supabase.
 
+const SCHEMA = "elabore";
 const PAGE_SIZE = 1000;
-const MAX_PAGES = 50;
-const TTL_MS = 10 * 60 * 1000; // as tabelas raw só mudam quando o pipeline roda
+const MAX_EXPORT_PAGES = 50;
+const CATALOG_TTL_MS = 10 * 60 * 1000; // dicionário e tipos só mudam quando o notebook roda
 
-const cache = new Map<string, { rows: Record<string, unknown>[]; expiresAt: number }>();
-const inFlight = new Map<string, Promise<Record<string, unknown>[]>>();
+/** Colunas de status de consistência: viram selo colorido na tabela. */
+const CONSISTENCY_COLUMNS = new Set([
+  "consistency_status",
+  "annual_consistency_status",
+  "monthly_status_annual",
+]);
+
+export type ElaboreColumn = ColumnDef & { group: string };
+
+export type ElaboreQuery = {
+  table: string;
+  /** Pares [coluna, expressão PostgREST], ex.: ["labor_rural_code", "in.(LR1,LR2)"]. */
+  filters: [string, string][];
+  order: string;
+  offset: number;
+  limit: number;
+};
 
 function supabaseConfig() {
   const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
@@ -21,50 +39,129 @@ function supabaseConfig() {
   return { url, key };
 }
 
-async function fetchAll(table: string, order: string): Promise<Record<string, unknown>[]> {
+async function elaboreFetch(path: string, headers: Record<string, string> = {}) {
   const { url, key } = supabaseConfig();
-  const all: Record<string, unknown>[] = [];
+  const res = await fetch(`${url}/rest/v1/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}`, "Accept-Profile": SCHEMA, ...headers },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Supabase ${res.status} em ${SCHEMA}.${path.split("?")[0]}${detail ? `: ${detail.slice(0, 180)}` : ""}`);
+  }
+  return res;
+}
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const from = page * PAGE_SIZE;
-    const res = await fetch(`${url}/rest/v1/${table}?select=*&order=${order}`, {
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${key}`,
-        Range: `${from}-${from + PAGE_SIZE - 1}`,
-      },
-      cache: "no-store",
+// ------------------------------------------------------------------------------
+// Catálogo de colunas: dicionário (rótulo, ordem, grupo) + tipo do Postgres (OpenAPI)
+// ------------------------------------------------------------------------------
+let catalogCache: { byTable: Map<string, ElaboreColumn[]>; expiresAt: number } | null = null;
+let catalogInFlight: Promise<Map<string, ElaboreColumn[]>> | null = null;
+
+function columnType(column: string, label: string, pgFormat: string | undefined): ColumnType {
+  if (CONSISTENCY_COLUMNS.has(column)) return "consistencia";
+  if (pgFormat === "boolean") return "boolean";
+  if (pgFormat?.startsWith("timestamp") || pgFormat === "date") {
+    return column === "reference_month" ? "month" : "date";
+  }
+  if (pgFormat === "double precision" || pgFormat === "numeric" || pgFormat === "integer") {
+    if (/R\$/.test(label)) return "currency";
+    if (/\(%|%\)|\(% /.test(label)) return "percent";
+    return "number";
+  }
+  return "text";
+}
+
+async function loadCatalog(): Promise<Map<string, ElaboreColumn[]>> {
+  const [dictRes, specRes] = await Promise.all([
+    elaboreFetch("dim_dicionario_colunas?select=tabela,coluna,rotulo,ordem,grupo&order=tabela.asc,ordem.asc"),
+    elaboreFetch(""),
+  ]);
+  const dict = (await dictRes.json()) as {
+    tabela: string;
+    coluna: string;
+    rotulo: string;
+    ordem: number;
+    grupo: string | null;
+  }[];
+  const spec = (await specRes.json()) as {
+    definitions?: Record<string, { properties?: Record<string, { format?: string }> }>;
+  };
+
+  const byTable = new Map<string, ElaboreColumn[]>();
+  for (const d of dict) {
+    const pgFormat = spec.definitions?.[d.tabela]?.properties?.[d.coluna]?.format;
+    const type = columnType(d.coluna, d.rotulo, pgFormat);
+    const list = byTable.get(d.tabela) ?? [];
+    list.push({
+      key: d.coluna,
+      label: d.rotulo,
+      type,
+      align:
+        type === "currency" || type === "number" || type === "percent"
+          ? "right"
+          : type === "text"
+            ? "left"
+            : "center",
+      group: d.grupo ?? "Outros",
     });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`Supabase ${res.status} em ${table}${detail ? `: ${detail.slice(0, 180)}` : ""}`);
-    }
+    byTable.set(d.tabela, list);
+  }
+  return byTable;
+}
+
+/** Colunas da tabela na ordem da aba do Excel, com rótulo, tipo e grupo. */
+export async function getElaboreColumns(table: string): Promise<ElaboreColumn[]> {
+  if (catalogCache && Date.now() < catalogCache.expiresAt) {
+    return catalogCache.byTable.get(table) ?? [];
+  }
+  if (!catalogInFlight) {
+    catalogInFlight = loadCatalog()
+      .then((byTable) => {
+        catalogCache = { byTable, expiresAt: Date.now() + CATALOG_TTL_MS };
+        return byTable;
+      })
+      .finally(() => {
+        catalogInFlight = null;
+      });
+  }
+  return (await catalogInFlight).get(table) ?? [];
+}
+
+// ------------------------------------------------------------------------------
+// Consulta filtrada e paginada no banco
+// ------------------------------------------------------------------------------
+function buildPath(q: Omit<ElaboreQuery, "offset" | "limit">, offset: number, limit: number) {
+  const sp = new URLSearchParams();
+  sp.set("select", "*");
+  for (const [col, expr] of q.filters) sp.append(col, expr);
+  sp.set("order", q.order);
+  sp.set("offset", String(offset));
+  sp.set("limit", String(limit));
+  return `${q.table}?${sp.toString()}`;
+}
+
+/** Uma página de linhas + total que atende aos filtros (Prefer: count=exact). */
+export async function queryElabore(
+  q: ElaboreQuery,
+): Promise<{ rows: Record<string, unknown>[]; total: number }> {
+  const res = await elaboreFetch(buildPath(q, q.offset, q.limit), { Prefer: "count=exact" });
+  const rows = (await res.json()) as Record<string, unknown>[];
+  const range = res.headers.get("Content-Range") ?? "";
+  const total = Number(range.split("/")[1]);
+  return { rows, total: Number.isFinite(total) ? total : rows.length };
+}
+
+/** Todas as linhas que atendem aos filtros (exportação), de 1000 em 1000. */
+export async function queryElaboreAll(
+  q: Omit<ElaboreQuery, "offset" | "limit">,
+): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  for (let page = 0; page < MAX_EXPORT_PAGES; page++) {
+    const res = await elaboreFetch(buildPath(q, page * PAGE_SIZE, PAGE_SIZE));
     const batch = (await res.json()) as Record<string, unknown>[];
     all.push(...batch);
     if (batch.length < PAGE_SIZE) break;
   }
-
   return all;
-}
-
-/** Lê a tabela inteira (paginando de 1000 em 1000) com cache em memória de 10 min. */
-export async function getSupabaseTable(
-  table: string,
-  order: string,
-): Promise<Record<string, unknown>[]> {
-  const cacheKey = `${table}|${order}`;
-  const hit = cache.get(cacheKey);
-  if (hit && Date.now() < hit.expiresAt) return hit.rows;
-
-  const pending = inFlight.get(cacheKey);
-  if (pending) return pending;
-
-  const read = fetchAll(table, order)
-    .then((rows) => {
-      cache.set(cacheKey, { rows, expiresAt: Date.now() + TTL_MS });
-      return rows;
-    })
-    .finally(() => inFlight.delete(cacheKey));
-  inFlight.set(cacheKey, read);
-  return read;
 }
