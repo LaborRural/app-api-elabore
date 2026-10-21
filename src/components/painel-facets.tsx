@@ -6,9 +6,9 @@ import type { ApexOptions } from "apexcharts";
 import { labelStep } from "@/lib/painel-format";
 
 // Múltiplos pequenos: cada medida tem o seu painel e o seu eixo, todos alinhados no mesmo
-// eixo de meses. Nunca eixo duplo: duas medidas de escalas diferentes viram dois painéis, e o
-// tooltip acompanha o mês nos dois ao mesmo tempo (chart.group). Só os extremos levam rótulo,
-// a linha tracejada é a média do período, e o valor da média fica no cabeçalho do painel.
+// eixo de meses. Nunca eixo duplo: duas medidas de escalas diferentes viram dois painéis.
+// Só os extremos levam rótulo, a linha tracejada é a média do período, e o valor da média
+// fica no cabeçalho do painel.
 const Chart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
   loading: () => <div className="painel-chart-empty">Carregando gráfico…</div>,
@@ -24,8 +24,8 @@ export type Facet = {
 };
 
 type Props = {
-  /** Identifica o grupo de tooltips sincronizados (único por card). */
-  id: string;
+  /** Identifica o card de múltiplos pequenos. */
+  id?: string;
   title: string;
   /** Frase-resumo calculada a partir dos dados (a conclusão do gráfico). */
   takeaway: string;
@@ -56,7 +56,7 @@ function mean(values: (number | null)[]): number | null {
   return valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
 }
 
-function FacetPlot({ id, facet, labels, last, height, labelAll }: { id: string; facet: Facet; labels: string[]; last: boolean; height: number; labelAll: boolean }) {
+function FacetPlot({ facet, labels, last, height, labelAll }: { facet: Facet; labels: string[]; last: boolean; height: number; labelAll: boolean }) {
   const decimals = facet.decimals ?? 2;
   const avg = mean(facet.values);
 
@@ -98,8 +98,6 @@ function FacetPlot({ id, facet, labels, last, height, labelAll }: { id: string; 
 
     return {
       chart: {
-        id: `${id}-${facet.name}`,
-        group: id,
         type: facet.kind === "bar" ? "bar" : "line",
         height: height + (last ? 22 : 0),
         toolbar: { show: false },
@@ -142,7 +140,7 @@ function FacetPlot({ id, facet, labels, last, height, labelAll }: { id: string; 
       tooltip: { shared: true, intersect: false, y: { formatter: (v) => (v == null ? "—" : `${fmt(v, decimals)} ${facet.unit}`) } },
       noData: { text: "Sem dados no período" },
     };
-  }, [facet, labels, id, last, decimals, avg, height, labelAll]);
+  }, [facet, labels, last, decimals, avg, height, labelAll]);
 
   const hasData = facet.values.some((v) => v !== null);
 
@@ -164,7 +162,7 @@ function FacetPlot({ id, facet, labels, last, height, labelAll }: { id: string; 
   );
 }
 
-export default function PainelFacets({ id, title, takeaway, labels, facets, facetHeight = DEFAULT_FACET_HEIGHT, labelAll = false }: Props) {
+export default function PainelFacets({ title, takeaway, labels, facets, facetHeight = DEFAULT_FACET_HEIGHT, labelAll = false }: Props) {
   return (
     <article className="panel-card painel-chart">
       <div className="painel-chart-head">
@@ -172,7 +170,7 @@ export default function PainelFacets({ id, title, takeaway, labels, facets, face
         <p>{takeaway}</p>
       </div>
       {facets.map((f, i) => (
-        <FacetPlot key={f.name} id={id} facet={f} labels={labels} last={i === facets.length - 1} height={facetHeight} labelAll={labelAll} />
+        <FacetPlot key={f.name} facet={f} labels={labels} last={i === facets.length - 1} height={facetHeight} labelAll={labelAll} />
       ))}
       <p className="painel-facet-note">Linha tracejada: média do período.</p>
     </article>

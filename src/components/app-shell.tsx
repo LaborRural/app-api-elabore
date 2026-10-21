@@ -506,7 +506,7 @@ export default function AppShell({
         <div className="flex items-center gap-3">
           <img src="/img/logo-branco.png" alt="Labor Rural" />
         </div>
-        <div className="text-right text-[13px] font-semibold text-white/90">
+        <div className="text-right text-[11.2px] font-semibold text-white/90">
           © Labor Rural | Departamento de Inteligência | 2026
         </div>
       </footer>

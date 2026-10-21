@@ -1,4 +1,3 @@
-import "@/app/painel-mensal.css";
 import type { AgroindustryItem, PropertySummaryItem } from "@/lib/api";
 import { formatCellValue } from "@/lib/format";
 import type { PainelAnualData } from "@/lib/painel-anual";

@@ -1,7 +1,5 @@
 "use client";
 
-import "@/app/painel-mensal.css";
-import "@/app/painel-custo.css";
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";

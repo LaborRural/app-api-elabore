@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./toolbar-table.css";
+import "./painel-mensal.css";
+import "./painel-custo.css";
 
 export const metadata: Metadata = {
   title: "API Elabore | Labor Rural",
