@@ -53,6 +53,50 @@ async function elaboreFetch(path: string, headers: Record<string, string> = {}) 
 }
 
 // ------------------------------------------------------------------------------
+// Produtor de cada fazenda: a API de propriedades só traz id_entrepreneur, mas as tabelas de
+// indicadores já trazem o rótulo "FAZENDA - Produtor" (property_entrepreneur_label) por código LR.
+// ------------------------------------------------------------------------------
+const PRODUCER_TTL_MS = 10 * 60 * 1000;
+let producerCache: { byCode: Map<string, string>; expiresAt: number } | null = null;
+let producerInFlight: Promise<Map<string, string>> | null = null;
+
+async function loadProducers(): Promise<Map<string, string>> {
+  const byCode = new Map<string, string>();
+  for (let page = 0; page < 30; page++) {
+    const res = await elaboreFetch(
+      `raw_indicadores_mensais?select=labor_rural_code,property_entrepreneur_label&order=reference_month.desc,id.asc&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`,
+    );
+    const batch = (await res.json()) as { labor_rural_code: string | null; property_entrepreneur_label: string | null }[];
+    for (const r of batch) {
+      const code = r.labor_rural_code?.trim().toUpperCase();
+      const label = r.property_entrepreneur_label ?? "";
+      const cut = label.lastIndexOf(" - ");
+      // Rótulo mais recente de cada código; o produtor é o que vem depois do último " - "
+      if (code && cut > 0 && !byCode.has(code)) byCode.set(code, label.slice(cut + 3).trim());
+    }
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return byCode;
+}
+
+/** Código LR (maiúsculo) -> nome do produtor. Vazio se o Supabase não responder. */
+export async function getProducerNames(): Promise<Map<string, string>> {
+  if (producerCache && Date.now() < producerCache.expiresAt) return producerCache.byCode;
+  if (!producerInFlight) {
+    producerInFlight = loadProducers()
+      .then((byCode) => {
+        producerCache = { byCode, expiresAt: Date.now() + PRODUCER_TTL_MS };
+        return byCode;
+      })
+      .catch(() => new Map<string, string>())
+      .finally(() => {
+        producerInFlight = null;
+      });
+  }
+  return producerInFlight;
+}
+
+// ------------------------------------------------------------------------------
 // Catálogo de colunas: dicionário (rótulo, ordem, grupo) + tipo do Postgres (OpenAPI)
 // ------------------------------------------------------------------------------
 let catalogCache: { byTable: Map<string, ElaboreColumn[]>; expiresAt: number } | null = null;

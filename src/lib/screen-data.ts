@@ -3,7 +3,8 @@ import {
   apiGetWithToken,
   fetchAllPagesWithToken,
   getAgroindustriesCatalog,
-  getPropertiesCatalog,
+  getPropertiesCatalogChecked,
+  resolvePropertyNames,
   type AgroindustryItem,
   type Page,
   type PropertySummaryItem,
@@ -26,6 +27,10 @@ export type ScreenFilterParams = {
   size?: string;
   sort?: string;
   dir?: string;
+  safra?: string; // painel de custo de forrageira: "25/26,24/25"
+  cultura?: string;
+  produto?: string;
+  view?: string; // "tabela" abre a tabela nas telas de Indicadores que têm painel (o painel é o padrão)
 };
 
 export type ResolvedScreenData = {
@@ -128,6 +133,30 @@ function normalizeText(val: unknown): string {
     .toLowerCase();
 }
 
+/** Culturas plantadas: traz nome da área e área total (própria + arrendada) a partir de /areas. */
+async function withAreaInfo(
+  token: string,
+  slug: string,
+  rows: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  if (slug !== "culturas-plantadas" || rows.length === 0) return rows;
+  try {
+    const { items } = await fetchAllPagesWithToken<Record<string, unknown>>(token, "/areas", undefined, 20);
+    const areas = new Map(items.map((a) => [String(a.id_area), a]));
+    return rows.map((r) => {
+      const a = areas.get(String(r.id_area));
+      if (!a) return r;
+      return {
+        ...r,
+        area_name: a.name,
+        area_total: Number(a.hectares_owned ?? 0) + Number(a.hectares_rented ?? 0),
+      };
+    });
+  } catch {
+    return rows;
+  }
+}
+
 export async function resolveScreenData(
   token: string,
   slug: string,
@@ -153,8 +182,8 @@ export async function resolveScreenData(
   const supportsActive = activeTab ? activeTab.supportsActive : screen.supportsActive;
 
   // Catálogos auxiliares em paralelo
-  const [properties, agroindustries] = await Promise.all([
-    getPropertiesCatalog(token),
+  const [{ items: properties, error: catalogError }, agroindustries] = await Promise.all([
+    getPropertiesCatalogChecked(token),
     getAgroindustriesCatalog(token),
   ]);
 
@@ -200,6 +229,10 @@ export async function resolveScreenData(
   let rawRows: Record<string, unknown>[] = [];
   let effectivePropertyId = rawParams.prop || undefined;
   let dynamicNotice = activeTab?.notice ?? screen.notice;
+  if (catalogError) {
+    const aviso = "Não foi possível carregar o catálogo de propriedades; alguns nomes podem aparecer incompletos. Recarregue a página.";
+    dynamicNotice = dynamicNotice ? `${dynamicNotice} ${aviso}` : aviso;
+  }
 
   // 1) Caso especial: EMPRESÁRIOS (extraído de /property/{id_property})
   if (slug === "empresarios") {
@@ -453,7 +486,8 @@ export async function resolveScreenData(
         page: pageNum,
         size: sizeNum,
       });
-      const enriched = enrichRows(res.items ?? [], propMap, agroMap);
+      await fillMissingProperties(token, res.items ?? [], propMap);
+      const enriched = await withAreaInfo(token, slug, enrichRows(res.items ?? [], propMap, agroMap));
       return {
         screen,
         activeTabId: activeTab?.id,
@@ -472,7 +506,8 @@ export async function resolveScreenData(
   }
 
   // Enriquecer com nome da propriedade e agroindústria
-  let rows = enrichRows(rawRows, propMap, agroMap);
+  await fillMissingProperties(token, rawRows, propMap);
+  let rows = await withAreaInfo(token, slug, enrichRows(rawRows, propMap, agroMap));
 
   // Aplicar filtros no servidor do front
   if (rawParams.prop && !requiresProperty) {
@@ -552,6 +587,27 @@ export async function resolveScreenData(
   };
 }
 
+/** Para ids de propriedade fora do catálogo, busca o nome em /property/{id} e completa o mapa. */
+async function fillMissingProperties(
+  token: string,
+  rows: Record<string, unknown>[],
+  propMap: Map<string, PropertySummaryItem>,
+): Promise<void> {
+  const missing = new Set<string>();
+  for (const row of rows) {
+    if (row.property_name) continue;
+    const fert = row.fertilization as Record<string, unknown> | undefined;
+    const mgmt = row.management as Record<string, unknown> | undefined;
+    const id = (row.id_property ?? fert?.id_property ?? mgmt?.id_property) as string | undefined;
+    if (id && !propMap.has(id)) missing.add(id);
+  }
+  if (missing.size === 0) return;
+  const names = await resolvePropertyNames(token, [...missing]);
+  for (const [id, name] of names) {
+    propMap.set(id, { id_property: id, property_name: name } as PropertySummaryItem);
+  }
+}
+
 function enrichRows(
   rows: Record<string, unknown>[],
   propMap: Map<string, PropertySummaryItem>,
@@ -574,7 +630,7 @@ function enrichRows(
       id_property: propId ?? row.id_property,
       id_agroindustry: agroId ?? row.id_agroindustry,
       property_name:
-        (row.property_name as string | undefined) ?? propInfo?.property_name ?? (propId ? propId.slice(0, 8) : "—"),
+        (row.property_name as string | undefined) ?? propInfo?.property_name ?? (propId ? "Propriedade não identificada" : "—"),
       agroindustry_name:
         (row.agroindustry_name as string | undefined) ?? agroInfo?.name ?? "—",
     };

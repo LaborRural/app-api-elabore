@@ -15,6 +15,61 @@ export function formatDatePtBr(val: unknown): string {
   return str;
 }
 
+// Códigos técnicos do banco → texto amigável (chave sem caixa).
+const FRIENDLY: Record<string, string> = {
+  active_approved: "Ativo - Aprovado",
+  active_pending: "Ativo - Pendente",
+  active_rejected: "Ativo - Reprovado",
+  active_in_review: "Ativo - Em análise",
+  inactive: "Inativo",
+  inactive_approved: "Inativo - Aprovado",
+  pending: "Pendente",
+  pending_approval: "Aguardando aprovação",
+  approved: "Aprovado",
+  rejected: "Reprovado",
+  blocked: "Bloqueado",
+  pasture: "Pasto",
+  semi_confined: "Semiconfinado",
+  confined: "Confinado",
+  compost_barn: "Compost barn",
+  free_stall: "Free stall",
+  tie_stall: "Tie stall",
+  paid: "Pago",
+  received: "Recebido",
+  open: "Em aberto",
+  overdue: "Atrasado",
+  late: "Atrasado",
+  canceled: "Cancelado",
+  cancelled: "Cancelado",
+  scheduled: "Previsto",
+  forecast: "Previsto",
+  partial: "Parcial",
+  partially_paid: "Pago parcialmente",
+  positive: "Positivo",
+  negative: "Negativo",
+  zero: "Zerado",
+  zeroed: "Zerado",
+  in_stock: "Em estoque",
+  out_of_stock: "Sem estoque",
+  low_stock: "Estoque baixo",
+  expense: "Despesa",
+  revenue: "Receita",
+};
+
+/** Só mexe em códigos técnicos (snake_case ou MAIÚSCULAS_COM_UNDERLINE); nomes comuns ficam como vieram. */
+export function friendlyText(val: string, loose = false): string {
+  const s = val.trim();
+  const k = s.toLowerCase();
+  if (FRIENDLY[k]) return FRIENDLY[k];
+  // loose (colunas "codigo"): também ajusta palavra única em MAIÚSCULAS ou minúsculas
+  const code = loose ? /^[A-Za-z0-9]+([_\s-][A-Za-z0-9]+)*$/ : /^[A-Za-z0-9]+(_[A-Za-z0-9]+)+$/;
+  if (code.test(s) && (s === k || s === s.toUpperCase())) {
+    const t = k.replace(/[_-]/g, " ");
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  return val;
+}
+
 /** Formata valores de célula para exibição em tela e exportação CSV. */
 export function formatCellValue(val: unknown, type: ColumnType = "text"): string {
   if (val === null || val === undefined || val === "") return "—";
@@ -61,8 +116,10 @@ export function formatCellValue(val: unknown, type: ColumnType = "text"): string
       return val === true ? "Sim" : val === false ? "Não" : "—";
     case "status":
       return val === true ? "Ativo" : val === false ? "Inativo" : String(val);
+    case "codigo":
+      return typeof val === "string" ? friendlyText(val, true) : String(val);
     default:
-      return String(val);
+      return typeof val === "string" ? friendlyText(val) : String(val);
   }
 }
 

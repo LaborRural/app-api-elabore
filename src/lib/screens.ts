@@ -19,6 +19,7 @@ export type ColumnType =
   | "boolean"
   | "status"
   | "consistencia"
+  | "codigo"
   | "parcelas_link";
 
 export type ColumnDef = {
@@ -211,13 +212,14 @@ export const SCREENS: Record<string, ScreenDef> = {
     byPropertyEndpoint: "/plantedculture/{id_property}",
     supportsActive: true,
     columns: [
-      { key: "name", label: "Identificação / Talhão", type: "text" },
-      { key: "culture.name", label: "Cultura", type: "text" },
-      { key: "culture.culture_type", label: "Tipo de Cultura", type: "text" },
+      { key: "area_name", label: "Nome da área", type: "text" },
+      { key: "name", label: "Identificação da cultura", type: "text" },
       { key: "property_name", label: "Propriedade", type: "text" },
-      { key: "planted_area", label: "Área Plantada (ha)", type: "number", align: "right" },
-      { key: "planted_at", label: "Data Plantio", type: "date", align: "center" },
-      { key: "observation", label: "Observação", type: "text" },
+      { key: "area_total", label: "Área total (ha)", type: "number", align: "right" },
+      { key: "culture.name", label: "Cultura", type: "text" },
+      { key: "culture.culture_type", label: "Tipo de cultura", type: "codigo" },
+      { key: "planted_area", label: "Área plantada (ha)", type: "number", align: "right" },
+      { key: "planted_at", label: "Data do plantio", type: "date", align: "center" },
       { key: "is_active", label: "Situação", type: "status", align: "center" },
     ],
   },
@@ -313,7 +315,7 @@ export const SCREENS: Record<string, ScreenDef> = {
     columns: [
       { key: "reference_month", label: "Competência", type: "date", align: "center" },
       { key: "property_name", label: "Propriedade", type: "text" },
-      { key: "type", label: "Tipo", type: "text" },
+      { key: "type", label: "Tipo", type: "codigo" },
       { key: "description", label: "Descrição", type: "text" },
       { key: "amount_total", label: "Valor Total (R$)", type: "currency", align: "right" },
       { key: "installment_count", label: "Nº Parcelas", type: "integer", align: "center" },
@@ -349,7 +351,7 @@ export const SCREENS: Record<string, ScreenDef> = {
       { key: "reference_month", label: "Competência", type: "date", align: "center" },
       { key: "property_name", label: "Propriedade", type: "text" },
       { key: "agroindustry_name", label: "Agroindústria", type: "text" },
-      { key: "tab", label: "Grupo / Aba", type: "text" },
+      { key: "tab", label: "Grupo / Aba", type: "codigo" },
       { key: "operation", label: "Operação", type: "text" },
       { key: "line_code", label: "Cód. Linha", type: "text" },
       { key: "item_code", label: "Cód. Item", type: "text" },
@@ -483,7 +485,7 @@ export const SCREENS: Record<string, ScreenDef> = {
           { key: "unit", label: "Unid.", type: "text", align: "center" },
           { key: "unit_value", label: "Valor Unit. (R$)", type: "currency", align: "right" },
           { key: "origin", label: "Origem", type: "text" },
-          { key: "situation", label: "Situação Estoque", type: "text", align: "center" },
+          { key: "situation", label: "Situação Estoque", type: "codigo", align: "center" },
           { key: "is_active", label: "Ativo", type: "status", align: "center" },
         ],
       },
@@ -537,7 +539,7 @@ export const SCREENS: Record<string, ScreenDef> = {
           { key: "forecast_date", label: "Previsão Pagto.", type: "date", align: "center" },
           { key: "payment_date", label: "Data Pagamento", type: "date", align: "center" },
           { key: "amount", label: "Valor Parcela (R$)", type: "currency", align: "right" },
-          { key: "status", label: "Status Financeiro", type: "text", align: "center" },
+          { key: "status", label: "Status Financeiro", type: "codigo", align: "center" },
           { key: "is_active", label: "Situação", type: "status", align: "center" },
         ],
       },
@@ -553,7 +555,7 @@ export const SCREENS: Record<string, ScreenDef> = {
           { key: "forecast_date", label: "Previsão Receb.", type: "date", align: "center" },
           { key: "receive_date", label: "Data Recebimento", type: "date", align: "center" },
           { key: "amount", label: "Valor Parcela (R$)", type: "currency", align: "right" },
-          { key: "status", label: "Status Financeiro", type: "text", align: "center" },
+          { key: "status", label: "Status Financeiro", type: "codigo", align: "center" },
           { key: "is_active", label: "Situação", type: "status", align: "center" },
         ],
       },
@@ -570,7 +572,7 @@ export const SCREENS: Record<string, ScreenDef> = {
           { key: "forecast_date", label: "Previsão Pagto.", type: "date", align: "center" },
           { key: "payment_date", label: "Data Pagamento", type: "date", align: "center" },
           { key: "amount", label: "Valor Parcela (R$)", type: "currency", align: "right" },
-          { key: "status", label: "Status Financeiro", type: "text", align: "center" },
+          { key: "status", label: "Status Financeiro", type: "codigo", align: "center" },
           { key: "is_active", label: "Situação", type: "status", align: "center" },
         ],
       },
@@ -587,7 +589,7 @@ export const SCREENS: Record<string, ScreenDef> = {
           { key: "forecast_date", label: "Previsão Pagto.", type: "date", align: "center" },
           { key: "payment_date", label: "Data Pagamento", type: "date", align: "center" },
           { key: "amount", label: "Valor Parcela (R$)", type: "currency", align: "right" },
-          { key: "status", label: "Status Financeiro", type: "text", align: "center" },
+          { key: "status", label: "Status Financeiro", type: "codigo", align: "center" },
           { key: "is_active", label: "Situação", type: "status", align: "center" },
         ],
       },
