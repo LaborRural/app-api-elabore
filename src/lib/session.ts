@@ -103,6 +103,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const iniciais = (
     partes.length > 1 ? partes[0][0] + partes[partes.length - 1][0] : partes[0].slice(0, 2)
   ).toUpperCase();
-  const papel = (await isInternalSession()) ? "Equipe Labor Rural" : "Consultor";
-  return { nome, iniciais, papel };
+  const papel = (await isInternalSession()) ? "Supervisor(a) da Labor Rural" : "Consultor";
+  return { nome: partes[0], iniciais, papel };
 }
