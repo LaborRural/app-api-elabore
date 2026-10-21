@@ -26,8 +26,6 @@ type Props = {
   fullSheetHref?: string;
   /** Conteúdo extra no cabeçalho (ex.: alternador Tabela/Painel). */
   headerExtra?: React.ReactNode;
-  /** Cards de KPI exibidos entre as abas e a barra de ferramentas. */
-  kpis?: React.ReactNode;
 };
 
 /** Setas de ordenação empilhadas (↑ sobre ↓); a direção ativa fica escura. */
@@ -128,7 +126,6 @@ export default function ScreenTable({
   effectivePropertyId,
   fullSheetHref,
   headerExtra,
-  kpis,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -206,8 +203,6 @@ export default function ScreenTable({
           ))}
         </nav>
       )}
-
-      {kpis}
 
       {/* BARRA: EXPORTAR (esquerda) · BUSCA + FILTROS (direita) */}
       {!screen.unavailableReason && (

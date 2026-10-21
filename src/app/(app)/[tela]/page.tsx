@@ -8,8 +8,6 @@ import { resolvePainelMensal } from "@/lib/painel-mensal";
 import { resolveScreenData, type ScreenFilterParams } from "@/lib/screen-data";
 import { SCREENS } from "@/lib/screens";
 import { getToken, isInternalSession } from "@/lib/session";
-import { buildAreaKpis } from "@/lib/area-kpis";
-import AreaKpiGrid from "@/components/area-kpi-grid";
 import ScreenTable from "@/components/screen-table";
 import PainelAnual from "@/components/painel-anual";
 import PainelCusto from "@/components/painel-custo";
@@ -17,9 +15,6 @@ import PainelMensal from "@/components/painel-mensal";
 
 // Telas de Indicadores que têm a visão "Painel" além da tabela (alternadas pelo submenu lateral).
 const TELAS_COM_PAINEL = new Set(["indicadores-mensais", "indicadores-anuais", "custo-forrageira"]);
-
-// Telas do grupo "Áreas" do menu, que exibem 2 KPIs acima da tabela.
-const AREA_SCREENS = new Set(["areas", "culturas-plantadas", "despesas-culturas"]);
 
 type PageProps = {
   params: Promise<{ tela: string }>;
@@ -111,17 +106,9 @@ async function ScreenContent({ params, searchParams }: PageProps) {
     return <PainelMensal data={painel.data} {...painelProps} fullSheetHref={internal ? `/api/planilha/monthly` : undefined} />;
   }
 
-  // KPIs do grupo "Áreas": calculados sobre todos os registros filtrados (não só a página).
-  const comKpis = AREA_SCREENS.has(tela);
   let data;
-  let kpis;
   try {
-    const [pageData, allData] = await Promise.all([
-      resolveScreenData(token, tela, sp),
-      comKpis ? resolveScreenData(token, tela, sp, { forExport: true }) : Promise.resolve(null),
-    ]);
-    data = pageData;
-    if (allData) kpis = buildAreaKpis(tela, allData);
+    data = await resolveScreenData(token, tela, sp);
   } catch (err) {
     if (err instanceof ApiAuthError) {
       redirect("/login?expired=1");
@@ -142,10 +129,8 @@ async function ScreenContent({ params, searchParams }: PageProps) {
       properties={data.properties}
       agroindustries={data.agroindustries}
       notice={data.notice}
-      kpis={kpis && kpis.length > 0 ? <AreaKpiGrid kpis={kpis} /> : undefined}
       effectivePropertyId={data.effectivePropertyId}
       fullSheetHref={data.screen.elabore && internal ? `/api/planilha/${data.screen.elabore.fullSheet}` : undefined}
     />
   );
 }
-
