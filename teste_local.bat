@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ==========================================
-echo  lr-web-elabore - teste local
+echo  app-api-elabore - teste local
 echo ==========================================
 
 where node >nul 2>nul
