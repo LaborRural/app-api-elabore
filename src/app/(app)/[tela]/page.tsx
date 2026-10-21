@@ -44,6 +44,23 @@ async function ScreenContent({ params, searchParams }: PageProps) {
     redirect("/login?expired=1");
   }
 
+  // Revisão em andamento: só o menu Indicadores está liberado.
+  if (SCREENS[tela].group !== "Indicadores") {
+    return (
+      <div className="panel-card flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span className="material-symbols-rounded text-[var(--green-800)]" style={{ fontSize: 40 }}>
+            construction
+          </span>
+          <h1 className="text-lg font-extrabold text-[var(--ink-strong)]">Em construção</h1>
+          <p className="text-xs text-[var(--muted)]">
+            A tela {SCREENS[tela].title} ainda está em desenvolvimento.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const sp = await searchParams;
   let data;
   try {

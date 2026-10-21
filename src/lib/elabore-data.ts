@@ -40,7 +40,7 @@ function parseMonths(mes?: string): number[] {
 const HIDDEN_ON_SCREEN = /^id_/;
 
 /** Abas de colunas a partir dos grupos do dicionário; colunas fixas aparecem em todas. */
-function buildTabs(allColumns: ElaboreColumn[], fixedKeys: string[]): ScreenTabDef[] {
+function buildTabs(allColumns: ElaboreColumn[], fixedKeys: string[], codeColumn: string): ScreenTabDef[] {
   const columns = allColumns.filter((c) => !HIDDEN_ON_SCREEN.test(c.key));
   const fixed = fixedKeys
     .map((k) => columns.find((c) => c.key === k))
@@ -54,8 +54,14 @@ function buildTabs(allColumns: ElaboreColumn[], fixedKeys: string[]): ScreenTabD
       group === "Identificação"
         ? own
         : [...fixed, ...own.filter((c) => !fixedKeys.includes(c.key))];
-    return { id: slug(group), label: group, endpoint: "", columns: cols.map(stripGroup) };
+    return { id: slug(group), label: group, endpoint: "", columns: codeFirst(cols, codeColumn).map(stripGroup) };
   });
+}
+
+/** Código LR sempre como primeira coluna, independente da ordem do dicionário. */
+function codeFirst<T extends { key: string }>(columns: T[], codeColumn: string): T[] {
+  const code = columns.find((c) => c.key === codeColumn);
+  return code ? [code, ...columns.filter((c) => c !== code)] : columns;
 }
 
 function stripGroup(column: ElaboreColumn): ColumnDef {
@@ -72,8 +78,8 @@ export async function resolveElaboreScreen(
   agroindustries: AgroindustryItem[],
   options: { forExport: boolean; page: number; size: number },
 ): Promise<ResolvedScreenData> {
-  const allColumns = await getElaboreColumns(source.table);
-  const tabs = buildTabs(allColumns, source.fixedColumns);
+  const allColumns = codeFirst(await getElaboreColumns(source.table), source.codeColumn);
+  const tabs = buildTabs(allColumns, source.fixedColumns, source.codeColumn);
   const activeTab = tabs.find((t) => t.id === rawParams.aba) ?? tabs[0];
   const screenWithTabs: ScreenDef = { ...screen, tabs };
   const columns = options.forExport ? allColumns.map(stripGroup) : (activeTab?.columns ?? []);
