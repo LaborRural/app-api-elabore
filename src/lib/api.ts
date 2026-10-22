@@ -79,28 +79,34 @@ export async function fetchAllPagesWithToken<T>(
   path: string,
   params?: QueryParams,
   maxPages = 50,
-): Promise<{ items: T[]; total: number }> {
+  concurrency = PAGE_CONCURRENCY,
+): Promise<{ items: T[]; total: number; pages: number }> {
   const first = await apiGetWithToken<Page<T>>(token, path, { ...params, page: 1, size: 100 });
   const all: T[] = [...(first.items ?? first.data ?? [])];
   const pages = Math.min(first.pages ?? 1, maxPages);
 
-  for (let start = 2; start <= pages; start += PAGE_CONCURRENCY) {
-    const batch = await Promise.all(
-      Array.from({ length: Math.min(PAGE_CONCURRENCY, pages - start + 1) }, (_, i) =>
-        apiGetWithToken<Page<T>>(token, path, { ...params, page: start + i, size: 100 }),
-      ),
-    );
-    for (const res of batch) all.push(...(res.items ?? res.data ?? []));
-  }
+  // Pool contínuo: cada worker pega a próxima página assim que termina, sem esperar o lote inteiro.
+  const rest = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 2);
+  const byPage = new Map<number, T[]>();
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < rest.length) {
+      const page = rest[cursor++];
+      const res = await apiGetWithToken<Page<T>>(token, path, { ...params, page, size: 100 });
+      byPage.set(page, res.items ?? res.data ?? []);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, rest.length) }, worker));
+  for (const page of rest) all.push(...(byPage.get(page) ?? []));
 
-  return { items: all, total: first.total ?? all.length };
+  return { items: all, total: first.total ?? all.length, pages: first.pages ?? 1 };
 }
 
 export async function fetchAllPages<T>(
   path: string,
   params?: QueryParams,
   maxPages = 50,
-): Promise<{ items: T[]; total: number }> {
+): Promise<{ items: T[]; total: number; pages: number }> {
   const token = await getToken();
   if (!token) redirect("/login?expired=1");
   try {
@@ -184,17 +190,41 @@ async function cachedCatalog<T>(token: string, path: string, maxPages: number): 
   });
 }
 
-/** Todas as páginas de um endpoint de lançamentos no período, com cache curto em memória. */
+// Períodos que já terminaram quase não mudam: cache longo. Período corrente: cache curto.
+const CLOSED_ENTRIES_TTL_MS = 60 * 60 * 1000;
+// Medido: com 8+ requisições simultâneas a API responde HTTP 500 (timeout de 30 s); 4 já é o limite seguro.
+const ENTRIES_CONCURRENCY = 4;
+
+function entriesTtl(end: string): number {
+  return end < `${new Date().getFullYear()}-01-01` ? CLOSED_ENTRIES_TTL_MS : ENTRIES_TTL_MS;
+}
+
+/** Todas as páginas de um endpoint de lançamentos no período, com cache em memória. */
 export async function getPeriodEntriesCached<T>(
   token: string,
   path: string,
   start: string,
   end: string,
   maxPages: number,
-): Promise<{ items: T[]; total: number }> {
-  return cachedLoad(token, `${path}?start=${start}&end=${end}&max=${maxPages}`, ENTRIES_TTL_MS, () =>
-    fetchAllPagesWithToken<T>(token, path, { start, end }, maxPages),
+): Promise<{ items: T[]; total: number; pages: number }> {
+  return cachedLoad(token, `${path}?start=${start}&end=${end}&max=${maxPages}`, entriesTtl(end), () =>
+    fetchAllPagesWithToken<T>(token, path, { start, end }, maxPages, ENTRIES_CONCURRENCY),
   );
+}
+
+/** Só a primeira página (rápida) de um endpoint de lançamentos: amostra recente + total do período. */
+export async function getEntriesHeadCached<T>(
+  token: string,
+  path: string,
+  start: string,
+  end: string,
+  size = 20,
+): Promise<{ items: T[]; total: number }> {
+  return cachedLoad(token, `${path}?start=${start}&end=${end}#head${size}`, entriesTtl(end), async () => {
+    const res = await apiGetWithToken<Page<T>>(token, path, { start, end, page: 1, size });
+    const items = res.items ?? res.data ?? [];
+    return { items, total: res.total ?? items.length };
+  });
 }
 
 /** Contagem (campo total) de um endpoint paginado, com cache em memória. */

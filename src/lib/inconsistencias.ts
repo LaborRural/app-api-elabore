@@ -37,6 +37,8 @@ function num(s: string): string {
 
 /** "PRODUCAO/VL" -> "Produção/VL"; siglas conhecidas ficam em maiúsculas. */
 function nomeIndicador(raw: string): string {
+  // Já veio com maiúsculas e minúsculas ("VL/Total de vacas"): mantém como está.
+  if (/[a-zà-ú]/.test(raw)) return raw.trim();
   const s = raw.trim().toLowerCase();
   const out = s.replace(/[a-zà-ú]+/g, (w) => (SIGLAS.has(w) ? w.toUpperCase() : (PALAVRAS[w] ?? w)));
   return out.charAt(0).toUpperCase() + out.slice(1);
@@ -47,7 +49,7 @@ function classificar(motivo: string): { cat: Categoria; detalhe: string } {
   const m = motivo.trim();
   if (!m || /AUSENTE|NAN|NULL/i.test(m)) return { cat: "ausente", detalhe: "" };
 
-  const lim = /^(ABAIXO DO MIN|ACIMA DO MAX)\s*[<>]=?\s*(-?[\d.]+)\s*:\s*(.+)$/i.exec(m);
+  const lim = /^(ABAIXO DO M[IÍ]N|ACIMA DO M[AÁ]X)\s*[<>]=?\s*(-?[\d.]+)\s*:\s*(.+)$/i.exec(m);
   if (lim) {
     const cat = /ABAIXO/i.test(lim[1]) ? "abaixo" : "acima";
     const valor = num(lim[3].trim());
@@ -67,16 +69,21 @@ function classificar(motivo: string): { cat: Categoria; detalhe: string } {
  */
 export function humanizarInconsistencias(texto: string, completo = false): string {
   const grupos = new Map<Categoria, string[]>();
+  let temMotivo = false;
 
   for (const parte of texto.split(";")) {
     const p = parte.trim();
     if (!p) continue;
     const m = /^(.*?)\s*\((.*)\)$/.exec(p);
     const { cat, detalhe } = m ? classificar(m[2]) : { cat: "outro" as Categoria, detalhe: "" };
+    if (m) temMotivo = true;
     const nome = nomeIndicador(m ? m[1] : p);
-    const item = detalhe && cat !== "outro" ? `${nome} (${detalhe})` : nome;
+    const item = detalhe ? `${nome} (${detalhe})` : nome;
     grupos.set(cat, [...(grupos.get(cat) ?? []), item]);
   }
+
+  // Só nomes de indicadores (coluna "Critérios violados"): lista direta, sem rótulo de grupo.
+  if (!temMotivo) return (grupos.get("outro") ?? []).join(", ");
 
   return ORDEM.filter((c) => grupos.has(c))
     .map((c) => {

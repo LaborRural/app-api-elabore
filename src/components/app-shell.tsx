@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MENU_GROUPS, SCREEN_LIST } from "@/lib/screens";
 import { NavIcon } from "@/components/nav-icon";
+import { VERSAO } from "@/lib/version";
+import NovidadesModal from "@/components/novidades-modal";
 
 // Telas com mais de uma visão: aparecem no menu como um título com submenus.
 // "soon" marca visões ainda não publicadas (aparecem sem link, com selo "Breve").
@@ -44,6 +46,34 @@ export default function AppShell({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [novidadesOpen, setNovidadesOpen] = useState(false);
+  const [pendingNav, setPendingNav] = useState<{ fromKey: string; label: string } | null>(null);
+
+  const routeKey = `${pathname}?${searchParams.toString()}`;
+  const isNavigating = pendingNav !== null && pendingNav.fromKey === routeKey;
+
+  useEffect(() => {
+    setPendingNav((prev) => (prev && prev.fromKey !== routeKey ? null : prev));
+  }, [routeKey]);
+
+  function handleNavClick(
+    targetHref: string,
+    label: string,
+    e?: React.MouseEvent<HTMLElement>,
+  ) {
+    if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) {
+      return;
+    }
+    const [targetPath, targetQuery = ""] = targetHref.split("?");
+    const targetSp = new URLSearchParams(targetQuery);
+    targetSp.sort();
+    const currentSp = new URLSearchParams(searchParams.toString());
+    currentSp.sort();
+    if (targetPath === pathname && targetSp.toString() === currentSp.toString()) {
+      return;
+    }
+    setPendingNav({ fromKey: routeKey, label });
+  }
 
   const currentSlug = pathname.replace(/^\//, "").split("/")[0] || "inicio";
 
@@ -144,7 +174,12 @@ export default function AppShell({
       {/* CABEÇALHO SUPERIOR (PADRÃO CASCA.CSS / FAIXA) */}
       <header className="elabore-header">
         <div className="hd-marca">
-          <Link href="/inicio" className="logos" title="Início - Labor Rural Elabore">
+          <Link
+            href="/inicio"
+            onClick={(e) => handleNavClick("/inicio", "Início", e)}
+            className="logos"
+            title="Início - Labor Rural Elabore"
+          >
             <img src="/img/elabore_icone.svg" alt="Labor Rural" />
             <h1>
               <span>Labor Rural</span>
@@ -216,7 +251,10 @@ export default function AppShell({
             <div className="hd-menu" hidden={!userMenuOpen} role="menu">
               <Link
                 href="/inicio"
-                onClick={() => setUserMenuOpen(false)}
+                onClick={(e) => {
+                  setUserMenuOpen(false);
+                  handleNavClick("/inicio", "Início", e);
+                }}
                 role="menuitem"
               >
                 <NavIcon name="inicio" size={17} />
@@ -283,7 +321,10 @@ export default function AppShell({
                 <Link
                   href="/inicio"
                   className="hdm-item"
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={(e) => {
+                    setMobileMenuOpen(false);
+                    handleNavClick("/inicio", "Início", e);
+                  }}
                 >
                   <NavIcon name="inicio" size={17} />
                   <span>Visão Geral</span>
@@ -323,6 +364,7 @@ export default function AppShell({
           {/* Item Topo: Início */}
           <Link
             href="/inicio"
+            onClick={(e) => handleNavClick("/inicio", "Início", e)}
             className={`gchip ${currentSlug === "inicio" ? "sel" : ""}`}
             title="Início"
           >
@@ -415,6 +457,9 @@ export default function AppShell({
                                 <Link
                                   key={sub.view}
                                   href={subHref(sub)}
+                                  onClick={(e) =>
+                                    handleNavClick(subHref(sub), `${sc.title} · ${sub.label}`, e)
+                                  }
                                   className={`gchip sn-sub-item ${isActive && currentView === sub.view ? "sel" : ""}`}
                                   title={`${sc.title} · ${sub.label}`}
                                 >
@@ -429,6 +474,7 @@ export default function AppShell({
                         <Link
                           key={sc.slug}
                           href={`/${sc.slug}`}
+                          onClick={(e) => handleNavClick(`/${sc.slug}`, sc.title, e)}
                           className={`gchip ${isActive ? "sel" : ""}`}
                           title={sc.title}
                         >
@@ -482,7 +528,12 @@ export default function AppShell({
 
           {/* Rodapé da Sidebar */}
           <div className="sn-rodape-versao">
-            <span className="sn-novidades-btn">
+            <button
+              type="button"
+              onClick={() => setNovidadesOpen(true)}
+              className="sn-novidades-btn cursor-pointer"
+              title="Clique para ver as novidades desta versão"
+            >
               <svg
                 className="ic-svg"
                 width="12"
@@ -498,13 +549,32 @@ export default function AppShell({
                 <path d="M12 8v4M12 16h.01" />
               </svg>
               <span>Elabore API</span>
-            </span>
-            <div className="sn-versao">Versão 1.0.0</div>
+            </button>
+            <div className="sn-versao" id="snVersao">Versão {VERSAO}</div>
           </div>
         </aside>
 
         {/* Conteúdo Principal */}
-        <main className="elabore-main">{children}</main>
+        <main className="elabore-main" aria-busy={isNavigating}>
+          {children}
+          {isNavigating && (
+            <div
+              className="elabore-page-loader"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="elabore-page-loader-box">
+                <div className="elabore-page-loader-spinner" aria-hidden="true" />
+                <p className="elabore-page-loader-title">
+                  Carregando {pendingNav?.label ?? "página"}…
+                </p>
+                <span className="elabore-page-loader-sub">
+                  Aguarde enquanto os dados são carregados
+                </span>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
 
       {/* RODAPÉ OFICIAL (PADRÃO FOOTER.FT / ELABORE) */}
@@ -517,13 +587,21 @@ export default function AppShell({
         </div>
       </footer>
 
+      <NovidadesModal open={novidadesOpen} onClose={() => setNovidadesOpen(false)} />
+
       {/* BARRA INFERIOR DE NAVEGAÇÃO MOBILE (PADRÃO BNAV / MOBILE.CSS) */}
       <nav className="bnav" aria-label="Navegação entre telas">
         <button
           className="bnb"
           type="button"
           disabled={!prevSlug}
-          onClick={() => prevSlug && router.push(`/${prevSlug}`)}
+          onClick={() => {
+            if (prevSlug) {
+              const label = SCREEN_LIST.find((s) => s.slug === prevSlug)?.title ?? "Início";
+              handleNavClick(`/${prevSlug}`, label);
+              router.push(`/${prevSlug}`);
+            }
+          }}
           aria-label="Tela anterior"
         >
           &#8249;
@@ -545,7 +623,13 @@ export default function AppShell({
           className="bnb"
           type="button"
           disabled={!nextSlug}
-          onClick={() => nextSlug && router.push(`/${nextSlug}`)}
+          onClick={() => {
+            if (nextSlug) {
+              const label = SCREEN_LIST.find((s) => s.slug === nextSlug)?.title ?? "Próxima tela";
+              handleNavClick(`/${nextSlug}`, label);
+              router.push(`/${nextSlug}`);
+            }
+          }}
           aria-label="Próxima tela"
         >
           &#8250;
@@ -581,7 +665,10 @@ export default function AppShell({
             {/* Atalho Início */}
             <Link
               href="/inicio"
-              onClick={() => setMobileSheetOpen(false)}
+              onClick={(e) => {
+                setMobileSheetOpen(false);
+                handleNavClick("/inicio", "Início", e);
+              }}
               className={`fl-chip ${currentSlug === "inicio" ? "sel" : ""}`}
             >
               <div className="flex items-center gap-2.5">
@@ -665,7 +752,10 @@ export default function AppShell({
                                 <Link
                                   key={sub.view}
                                   href={subHref(sub)}
-                                  onClick={() => setMobileSheetOpen(false)}
+                                  onClick={(e) => {
+                                    setMobileSheetOpen(false);
+                                    handleNavClick(subHref(sub), `${sc.title} · ${sub.label}`, e);
+                                  }}
                                   className={`fl-chip sn-sub-item ${isActive && currentView === sub.view ? "sel" : ""}`}
                                 >
                                   <span className="gt">{sub.label}</span>
@@ -679,7 +769,10 @@ export default function AppShell({
                         <Link
                           key={sc.slug}
                           href={`/${sc.slug}`}
-                          onClick={() => setMobileSheetOpen(false)}
+                          onClick={(e) => {
+                            setMobileSheetOpen(false);
+                            handleNavClick(`/${sc.slug}`, sc.title, e);
+                          }}
                           className={`fl-chip ${isActive ? "sel" : ""}`}
                         >
                           <span className="gt">{sc.title}</span>

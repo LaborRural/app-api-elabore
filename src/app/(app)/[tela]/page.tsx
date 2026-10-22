@@ -12,6 +12,7 @@ import ScreenTable from "@/components/screen-table";
 import PainelAnual from "@/components/painel-anual";
 import PainelCusto from "@/components/painel-custo";
 import PainelMensal from "@/components/painel-mensal";
+import PageLoadingState from "@/components/page-loading";
 
 // Telas de Indicadores que têm a visão "Painel" além da tabela (alternadas pelo submenu lateral).
 const TELAS_COM_PAINEL = new Set(["indicadores-mensais", "indicadores-anuais", "custo-forrageira"]);
@@ -23,18 +24,7 @@ type PageProps = {
 
 export default function DynamicScreenPage({ params, searchParams }: PageProps) {
   return (
-    <Suspense
-      fallback={
-        <div className="panel-card flex items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-3 border-[var(--line)] border-t-[#0f6e56]" />
-            <span className="text-xs font-bold text-[var(--green-900)]">
-              Carregando dados da API Elabore…
-            </span>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<PageLoadingState />}>
       <ScreenContent params={params} searchParams={searchParams} />
     </Suspense>
   );

@@ -41,12 +41,12 @@ function parseMonths(mes?: string): number[] {
 }
 
 // Chaves técnicas (UUID do Elabore: id_property, id_production, id_planted_culture) não vão
-// para a tela; continuam na exportação.
-const HIDDEN_ON_SCREEN = /^id_/;
+// para a tela nem para o download de planilhas.
+const HIDDEN_UUID_COLUMNS = /^id_/i;
 
 /** Abas de colunas a partir dos grupos do dicionário; colunas fixas aparecem em todas. */
 function buildTabs(allColumns: ElaboreColumn[], fixedKeys: string[], codeColumn: string): ScreenTabDef[] {
-  const columns = allColumns.filter((c) => !HIDDEN_ON_SCREEN.test(c.key));
+  const columns = allColumns.filter((c) => !HIDDEN_UUID_COLUMNS.test(c.key));
   const fixed = fixedKeys
     .map((k) => columns.find((c) => c.key === k))
     .filter((c): c is ElaboreColumn => Boolean(c));
@@ -87,7 +87,8 @@ export async function resolveElaboreScreen(
   const tabs = buildTabs(allColumns, source.fixedColumns, source.codeColumn);
   const activeTab = tabs.find((t) => t.id === rawParams.aba) ?? tabs[0];
   const screenWithTabs: ScreenDef = { ...screen, tabs };
-  const columns = options.forExport ? allColumns.map(stripGroup) : (activeTab?.columns ?? []);
+  const visibleColumns = allColumns.filter((c) => !HIDDEN_UUID_COLUMNS.test(c.key));
+  const columns = options.forExport ? visibleColumns.map(stripGroup) : (activeTab?.columns ?? []);
 
   const empty = (notice?: string): ResolvedScreenData => ({
     screen: screenWithTabs,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { formatCellValue } from "@/lib/format";
@@ -8,6 +8,7 @@ import { getNestedValue, type ColumnDef, type ScreenDef } from "@/lib/screens";
 import type { AgroindustryItem, PropertySummaryItem } from "@/lib/api";
 import ScreenFilters from "./screen-filters";
 import ExportMenu, { type ExportFormat } from "./export-menu";
+import FullSheetButton from "./full-sheet-button";
 
 type Props = {
   screen: ScreenDef;
@@ -141,6 +142,14 @@ export default function ScreenTable({
   const currentDir = searchParams.get("dir") ?? "asc";
 
   const [exporting, setExporting] = useState<string | null>(null);
+  const exportAbortRef = useRef<AbortController | null>(null);
+
+  function handleCancelExport() {
+    exportAbortRef.current?.abort();
+    exportAbortRef.current = null;
+    setExporting(null);
+  }
+
   function goToPage(n: number) {
     if (n !== page) router.push(buildUrl({ page: n }));
   }
@@ -163,18 +172,59 @@ export default function ScreenTable({
     router.push(buildUrl({ sort: colKey, dir: nextDir, page: 1 }));
   }
 
-  function handleExport(formato: ExportFormat) {
+  async function handleExport(formato: ExportFormat) {
     if (formato === "excel" || formato === "csv") {
+      if (exporting) return;
       const targetFmt = formato === "excel" ? "xlsx" : "csv";
-      setExporting(targetFmt.toUpperCase());
+      const controller = new AbortController();
+      exportAbortRef.current = controller;
+      setExporting(formato === "excel" ? "Excel" : "CSV");
       const sp = new URLSearchParams(searchParams.toString());
       sp.set("formato", targetFmt);
       if (activeTabId && !sp.get("aba")) {
         sp.set("aba", activeTabId);
       }
       const url = `/api/export/${screen.slug}?${sp.toString()}`;
-      window.location.href = url;
-      setTimeout(() => setExporting(null), 2500);
+      try {
+        const res = await fetch(url, {
+          credentials: "same-origin",
+          signal: controller.signal,
+        });
+        if (res.status === 401) {
+          window.location.href = "/login?expired=1";
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(`Falha ao exportar (${res.status})`);
+        }
+        const disposition = res.headers.get("Content-Disposition") ?? "";
+        const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)["']?/i);
+        const filename = match?.[1]
+          ? decodeURIComponent(match[1])
+          : `${screen.exportName}.${targetFmt}`;
+
+        const blob = await res.blob();
+        if (controller.signal.aborted) return;
+
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+      } catch (err) {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+          return;
+        }
+        window.location.href = url;
+      } finally {
+        if (exportAbortRef.current === controller) {
+          exportAbortRef.current = null;
+          setExporting(null);
+        }
+      }
     } else if (formato === "pdf-resumido" || formato === "pdf-expandido") {
       window.print();
     }
@@ -216,22 +266,11 @@ export default function ScreenTable({
           <div className="lanc-filtro-esq">
             <ExportMenu
               onExport={handleExport}
+              onCancel={handleCancelExport}
               disabled={exporting !== null}
               exportingFormat={exporting}
             />
-            {fullSheetHref && (
-              <a
-                href={fullSheetHref}
-                download
-                className="btn-table-export"
-                title="Baixa a última planilha gerada pelo lr-indicadores-elabore, com todas as abas e todas as fazendas"
-              >
-                <span className="material-symbols-rounded" style={{ fontSize: 17 }}>
-                  cloud_download
-                </span>
-                <span>Planilha completa</span>
-              </a>
-            )}
+            {fullSheetHref && <FullSheetButton href={fullSheetHref} />}
           </div>
 
           <ScreenFilters
@@ -364,9 +403,9 @@ export default function ScreenTable({
                         return (
                           <td key={col.key} className={alignClass}>
                             {raw === true ? (
-                              <span className="badge badge-info">Sim</span>
+                              <span className="badge badge-positive">Sim</span>
                             ) : raw === false ? (
-                              <span className="badge badge-neutral">Não</span>
+                              <span className="badge badge-danger">Não</span>
                             ) : (
                               "-"
                             )}
