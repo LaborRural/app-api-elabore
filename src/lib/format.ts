@@ -16,6 +16,23 @@ export function formatDatePtBr(val: unknown): string {
   return str;
 }
 
+/** Formata um timestamp ISO ou Date para "dd/mm/aaaa às hh:mm" em pt-BR (fuso de Brasília). */
+export function formatDateTimePtBr(val: unknown): string {
+  if (!val) return "-";
+  const d = new Date(String(val));
+  if (Number.isNaN(d.getTime())) return String(val);
+  return d
+    .toLocaleString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    .replace(", ", " às ");
+}
+
 // Códigos técnicos do banco → texto amigável (chave sem caixa).
 const FRIENDLY: Record<string, string> = {
   active_approved: "Ativo - Aprovado",
@@ -32,6 +49,9 @@ const FRIENDLY: Record<string, string> = {
   pasture: "Pasto",
   semi_confined: "Semiconfinado",
   confined: "Confinado",
+  unstructured_confinment: "Confinamento sem estrutura",
+  unstructured_confinement: "Confinamento sem estrutura",
+  mixed: "Misto",
   compost_barn: "Compost barn",
   free_stall: "Free stall",
   tie_stall: "Tie stall",
@@ -145,4 +165,3 @@ export function buildExportTimestamp(now = new Date()): string {
   const ss = pad(now.getSeconds());
   return `${yyyy}_${mm}_${dd}_${hh}${min}${ss}`;
 }
-

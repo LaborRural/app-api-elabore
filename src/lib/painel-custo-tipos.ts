@@ -74,4 +74,5 @@ export type PainelCustoData = {
     producoesDescartadas: number;
     ultimaColheita: string | null;
   };
+  dataProcessamento?: string | null;
 };

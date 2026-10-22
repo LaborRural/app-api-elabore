@@ -1,8 +1,9 @@
 import "server-only";
 import type { PropertySummaryItem } from "./api";
+import { formatDateTimePtBr } from "./format";
 import type { PainelData, PainelRow } from "./painel-mensal";
 import type { ColumnType } from "./screens";
-import { getElaboreColumns, queryElaboreAll } from "./supabase";
+import { getDataProcessamento, getElaboreColumns, queryElaboreAll } from "./supabase";
 
 // Painel anual da fazenda (Indicadores Anuais): cada coluna é uma janela móvel de 12 meses,
 // identificada pelo mês em que ela termina. Nenhuma fórmula é recalculada aqui: tudo vem de
@@ -61,23 +62,27 @@ export async function resolvePainelAnual(
   params: PainelAnualParams,
   properties: PropertySummaryItem[],
 ): Promise<PainelAnualData> {
-  const empty = (notice: string, property: PropertySummaryItem | null = null): PainelAnualData => ({
-    property,
-    months: [],
-    groups: [],
-    series: {},
-    base: null,
-    notice,
-  });
+  const empty = async (notice: string, property: PropertySummaryItem | null = null): Promise<PainelAnualData> => {
+    const rawProcDate = await getDataProcessamento(TABLE);
+    return {
+      property,
+      months: [],
+      groups: [],
+      series: {},
+      base: null,
+      notice,
+      dataProcessamento: rawProcDate ? formatDateTimePtBr(rawProcDate) : null,
+    };
+  };
 
   const property =
     properties.find((p) => p.id_property === params.prop) ??
     (properties.length === 1 ? properties[0] : null);
-  if (!property) return empty("Escolha uma fazenda no filtro para abrir o painel.");
+  if (!property) return await empty("Escolha uma fazenda no filtro para abrir o painel.");
 
   const columns = await getElaboreColumns(TABLE);
   if (columns.length === 0) {
-    return empty(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`, property);
+    return await empty(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`, property);
   }
 
   const code = property.labor_rural_code?.trim().toUpperCase();
@@ -106,7 +111,7 @@ export async function resolvePainelAnual(
     (w) => (!year || w.key.startsWith(year)) && (!selected.length || selected.includes(Number(w.key.slice(5)))),
   );
   if (!year && !selected.length) kept = kept.slice(-DEFAULT_WINDOWS);
-  if (kept.length === 0) return empty("Esta fazenda não tem indicadores anuais para o período escolhido.", property);
+  if (kept.length === 0) return await empty("Esta fazenda não tem indicadores anuais para o período escolhido.", property);
 
   const baseWindow = windows.find((w) => w.key === shiftKey(kept[kept.length - 1].key, -12));
 
@@ -127,6 +132,11 @@ export async function resolvePainelAnual(
     group.rows.push(row);
   }
 
+  const rawProcDate = (fetched[0] as Record<string, unknown> | undefined)?.data_processamento
+    ? String((fetched[0] as Record<string, unknown>).data_processamento)
+    : await getDataProcessamento(TABLE);
+  const dataProcessamento = rawProcDate ? formatDateTimePtBr(rawProcDate) : null;
+
   return {
     property,
     months: kept.map((w) => ({
@@ -138,5 +148,6 @@ export async function resolvePainelAnual(
     groups,
     series,
     base: baseWindow ? { label: baseWindow.label, values: baseValues } : null,
+    dataProcessamento,
   };
 }

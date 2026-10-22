@@ -1,7 +1,8 @@
 import "server-only";
 import type { PropertySummaryItem } from "./api";
+import { formatDateTimePtBr } from "./format";
 import type { ColumnType } from "./screens";
-import { getElaboreColumns, queryElaboreAll } from "./supabase";
+import { getDataProcessamento, getElaboreColumns, queryElaboreAll } from "./supabase";
 
 // Painel da fazenda (Indicadores Mensais): meses nas colunas, indicadores nas linhas.
 // Nenhuma fórmula é recalculada aqui: tudo vem de elabore.raw_indicadores_mensais, gravada pelo
@@ -37,6 +38,8 @@ export type PainelData = {
   series: Record<string, (number | null)[]>;
   /** Mensagem quando não há o que mostrar. */
   notice?: string;
+  /** Data e horário de referência do processamento no Elabore. */
+  dataProcessamento?: string | null;
 };
 
 const MONTH_NAMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -68,25 +71,29 @@ export async function resolvePainelMensal(
   params: PainelParams,
   properties: PropertySummaryItem[],
 ): Promise<PainelData> {
-  const empty = (notice: string, property: PropertySummaryItem | null = null): PainelData => ({
-    property,
-    months: [],
-    groups: [],
-    series: {},
-    notice,
-  });
+  const empty = async (notice: string, property: PropertySummaryItem | null = null): Promise<PainelData> => {
+    const rawProcDate = await getDataProcessamento(TABLE);
+    return {
+      property,
+      months: [],
+      groups: [],
+      series: {},
+      notice,
+      dataProcessamento: rawProcDate ? formatDateTimePtBr(rawProcDate) : null,
+    };
+  };
 
   // Fazenda: a escolhida no filtro ou, se o usuário só enxerga uma, essa.
   const property =
     properties.find((p) => p.id_property === params.prop) ??
     (properties.length === 1 ? properties[0] : null);
   if (!property) {
-    return empty("Escolha uma fazenda no filtro para abrir o painel.");
+    return await empty("Escolha uma fazenda no filtro para abrir o painel.");
   }
 
   const columns = await getElaboreColumns(TABLE);
   if (columns.length === 0) {
-    return empty(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`, property);
+    return await empty(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`, property);
   }
 
   const code = property.labor_rural_code?.trim().toUpperCase();
@@ -120,7 +127,7 @@ export async function resolvePainelMensal(
     kept.push(row);
   }
   if (kept.length === 0) {
-    return empty("Esta fazenda não tem indicadores mensais para o período escolhido.", property);
+    return await empty("Esta fazenda não tem indicadores mensais para o período escolhido.", property);
   }
 
   const series: Record<string, (number | null)[]> = {};
@@ -135,5 +142,10 @@ export async function resolvePainelMensal(
     group.rows.push({ key: col.key, label: col.label, type: col.type ?? "number", values, average: mean(values) });
   }
 
-  return { property, months, groups, series };
+  const rawProcDate = (rows[0] as Record<string, unknown> | undefined)?.data_processamento
+    ? String((rows[0] as Record<string, unknown>).data_processamento)
+    : await getDataProcessamento(TABLE);
+  const dataProcessamento = rawProcDate ? formatDateTimePtBr(rawProcDate) : null;
+
+  return { property, months, groups, series, dataProcessamento };
 }

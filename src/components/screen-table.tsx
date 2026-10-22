@@ -27,6 +27,7 @@ type Props = {
   fullSheetHref?: string;
   /** Conteúdo extra no cabeçalho (ex.: alternador Tabela/Painel). */
   headerExtra?: React.ReactNode;
+  dataProcessamento?: string | null;
 };
 
 /** Setas de ordenação empilhadas (↑ sobre ↓); a direção ativa fica escura. */
@@ -133,6 +134,7 @@ export default function ScreenTable({
   effectivePropertyId,
   fullSheetHref,
   headerExtra,
+  dataProcessamento,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -241,7 +243,15 @@ export default function ScreenTable({
           <h1 className="page-title">{TABELA_SUBTITLE_MAP[screen.slug] ?? screen.title}</h1>
           {screen.subtitle && <p className="page-subtitle">{screen.subtitle}</p>}
         </div>
-        {headerExtra}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {dataProcessamento && (
+            <div className="indicador-ref-badge" title="Data e horário de referência do processamento dos dados no Elabore">
+              <span className="material-symbols-rounded" style={{ fontSize: 16 }}>schedule</span>
+              <span>Ref. dos Dados: <strong>{dataProcessamento}</strong></span>
+            </div>
+          )}
+          {headerExtra}
+        </div>
       </div>
 
       {/* ABAS SUBLINHADAS (quando a tela possui mais de um endpoint) */}

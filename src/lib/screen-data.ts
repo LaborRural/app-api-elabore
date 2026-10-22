@@ -46,6 +46,7 @@ export type ResolvedScreenData = {
   agroindustries: AgroindustryItem[];
   notice?: string;
   effectivePropertyId?: string;
+  dataProcessamento?: string | null;
 };
 
 /** Converte Ano + Mês (multi-seleção) em start/end ISO (YYYY-MM-DD) e lista de meses. */

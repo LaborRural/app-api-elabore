@@ -1,10 +1,11 @@
 import "server-only";
 import type { AgroindustryItem, PropertySummaryItem } from "./api";
+import { formatDateTimePtBr } from "./format";
 import type { ResolvedScreenData, ScreenFilterParams } from "./screen-data";
 import type { ColumnDef, ElaboreSourceDef, ScreenDef, ScreenTabDef } from "./screens";
 import { resolveElaboreScope } from "./elabore-scope";
 import { isInternalSession } from "./session";
-import { getElaboreColumns, queryElabore, queryElaboreAll, type ElaboreColumn } from "./supabase";
+import { getDataProcessamento, getElaboreColumns, queryElabore, queryElaboreAll, type ElaboreColumn } from "./supabase";
 
 // Telas de Indicadores: schema "elabore" do Supabase, filtrado e paginado no banco.
 // Só entram fazendas cujo código (labor_rural_code) está no catálogo de propriedades
@@ -103,6 +104,7 @@ export async function resolveElaboreScreen(
     properties,
     agroindustries,
     notice: notice ?? screen.notice,
+    dataProcessamento: null,
   });
 
   if (allColumns.length === 0) {
@@ -173,11 +175,15 @@ export async function resolveElaboreScreen(
 
   if (options.forExport) {
     const rows = await queryElaboreAll({ table: source.table, filters, order });
+    const rawProcDate = (rows[0] as Record<string, unknown> | undefined)?.data_processamento
+      ? String((rows[0] as Record<string, unknown>).data_processamento)
+      : await getDataProcessamento(source.table);
     return {
       ...empty(),
       rows,
       total: rows.length,
       size: rows.length || 1,
+      dataProcessamento: rawProcDate ? formatDateTimePtBr(rawProcDate) : null,
     };
   }
 
@@ -190,11 +196,16 @@ export async function resolveElaboreScreen(
     limit: options.size,
   });
   const pages = Math.max(1, Math.ceil(total / options.size));
+  const rawProcDate = (rows[0] as Record<string, unknown> | undefined)?.data_processamento
+    ? String((rows[0] as Record<string, unknown>).data_processamento)
+    : await getDataProcessamento(source.table);
+
   return {
     ...empty(),
     rows,
     total,
     page: Math.min(options.page, pages),
     pages,
+    dataProcessamento: rawProcDate ? formatDateTimePtBr(rawProcDate) : null,
   };
 }

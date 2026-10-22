@@ -80,6 +80,12 @@ export default function PainelAnual({ data, properties, agroindustries, exportHr
           <h1 className="page-title">Indicadores Anuais - Painel Anual</h1>
           <p className="page-subtitle">Painel anual da fazenda: janelas móveis de 12 meses, identificadas pelo mês em que terminam</p>
         </div>
+        {data.dataProcessamento && (
+          <div className="indicador-ref-badge" title="Data e horário de referência do processamento dos dados no Elabore">
+            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>schedule</span>
+            <span>Ref. dos Dados: <strong>{data.dataProcessamento}</strong></span>
+          </div>
+        )}
       </div>
 
       <div className="lancamentos-filtro-bar">

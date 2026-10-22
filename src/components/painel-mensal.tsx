@@ -145,7 +145,7 @@ export default function PainelMensal({ data: fullData, properties, agroindustrie
       {farm && (
         <div className="painel-print-only painel-print-foot">
           <span>© Labor Rural | Departamento de Inteligência | 2026</span>
-          <span>Emitido em {emitidoEm}</span>
+          <span>{data.dataProcessamento ? `Base de dados: ${data.dataProcessamento} · ` : ""}Emitido em {emitidoEm}</span>
         </div>
       )}
       <div className="painel-head">
@@ -153,6 +153,12 @@ export default function PainelMensal({ data: fullData, properties, agroindustrie
           <h1 className="page-title">Indicadores Mensais - Painel da Fazenda</h1>
           <p className="page-subtitle">Painel da fazenda: meses nas colunas, indicadores nas linhas</p>
         </div>
+        {data.dataProcessamento && (
+          <div className="indicador-ref-badge" title="Data e horário de referência do processamento dos dados no Elabore">
+            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>schedule</span>
+            <span>Ref. dos Dados: <strong>{data.dataProcessamento}</strong></span>
+          </div>
+        )}
       </div>
 
       <div className="lancamentos-filtro-bar">

@@ -73,6 +73,12 @@ export default function PainelCusto({ data, properties, agroindustries, fullShee
           <h1 className="page-title">Custo de Forrageira - Painel de Custos</h1>
           <p className="page-subtitle">Painel de custos por sistema de plantio · mesmas regras da tela 7 do BI gerencial</p>
         </div>
+        {data.dataProcessamento && (
+          <div className="indicador-ref-badge" title="Data e horário de referência do processamento dos dados no Elabore">
+            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>schedule</span>
+            <span>Ref. dos Dados: <strong>{data.dataProcessamento}</strong></span>
+          </div>
+        )}
       </div>
 
       <div className="lancamentos-filtro-bar">

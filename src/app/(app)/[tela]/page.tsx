@@ -121,6 +121,7 @@ async function ScreenContent({ params, searchParams }: PageProps) {
       notice={data.notice}
       effectivePropertyId={data.effectivePropertyId}
       fullSheetHref={data.screen.elabore && internal ? `/api/planilha/${data.screen.elabore.fullSheet}` : undefined}
+      dataProcessamento={data.dataProcessamento}
     />
   );
 }

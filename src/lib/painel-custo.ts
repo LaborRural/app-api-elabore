@@ -1,9 +1,10 @@
 import "server-only";
 import type { PropertySummaryItem } from "./api";
+import { formatDateTimePtBr } from "./format";
 import { ETAPAS, SISTEMAS, SISTEMA_ROTULO, type EtapaKey, type PainelCustoData, type PainelCustoParams, type PorSistema, type Sistema, type DetalheLinha } from "./painel-custo-tipos";
 import { resolveElaboreScope } from "./elabore-scope";
 import { isInternalSession } from "./session";
-import { getElaboreColumns, queryElaboreAll } from "./supabase";
+import { getDataProcessamento, getElaboreColumns, queryElaboreAll } from "./supabase";
 
 // Painel de custos de forrageira: mesmas regras da tela 7 (Safra de Forrageiras) do BI gerencial,
 // lidas de elabore.raw_custo_forrageira. Soma/soma por sistema de plantio (nunca média de médias),
@@ -124,23 +125,27 @@ export async function resolvePainelCusto(
   params: PainelCustoParams,
   properties: PropertySummaryItem[],
 ): Promise<PainelCustoData> {
-  const vazio = (notice: string): PainelCustoData => ({
-    notice,
-    safras: [],
-    culturas: [],
-    produtos: [],
-    selecao: { safra: [], cultura: [], produto: [] },
-    custoBase: "NOMINAL",
-    avisos: [],
-    sistema: { areaTotal: 0, areaNaoInformada: 0, fazendas: 0, itens: [], conservacionistaPct: null },
-    porSistema: [],
-    detalhe: [],
-    rodape: { fazendasComCusto: 0, fazendasSemPrePlantio: 0, producoesDescartadas: 0, ultimaColheita: null },
-  });
+  const vazio = async (notice: string): Promise<PainelCustoData> => {
+    const rawProcDate = await getDataProcessamento(TABLE);
+    return {
+      notice,
+      safras: [],
+      culturas: [],
+      produtos: [],
+      selecao: { safra: [], cultura: [], produto: [] },
+      custoBase: "NOMINAL",
+      avisos: [],
+      sistema: { areaTotal: 0, areaNaoInformada: 0, fazendas: 0, itens: [], conservacionistaPct: null },
+      porSistema: [],
+      detalhe: [],
+      rodape: { fazendasComCusto: 0, fazendasSemPrePlantio: 0, producoesDescartadas: 0, ultimaColheita: null },
+      dataProcessamento: rawProcDate ? formatDateTimePtBr(rawProcDate) : null,
+    };
+  };
 
   const columns = await getElaboreColumns(TABLE);
   if (columns.length === 0) {
-    return vazio(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`);
+    return await vazio(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`);
   }
 
   // Escopo: só fazendas que a API libera para o usuário (+ filtros Fazenda/Agroindústria).
@@ -150,7 +155,7 @@ export async function resolvePainelCusto(
     prop: params.prop,
     agro: params.agro,
   });
-  if (scope.kind === "empty") return vazio("Nenhuma fazenda disponível para os filtros escolhidos.");
+  if (scope.kind === "empty") return await vazio("Nenhuma fazenda disponível para os filtros escolhidos.");
   const filters: [string, string][] = [];
   if (scope.kind === "codes") filters.push(["labor_rural_code", `in.(${scope.codes.map(plain).join(",")})`]);
 
@@ -161,7 +166,7 @@ export async function resolvePainelCusto(
   });
 
   const doCiclo = fetched.filter((r) => cicloDe(r) === CICLO_PADRAO && text(r.harvest_season));
-  if (doCiclo.length === 0) return vazio("Sem produções de 1ª safra para os filtros escolhidos.");
+  if (doCiclo.length === 0) return await vazio("Sem produções de 1ª safra para os filtros escolhidos.");
 
   // Consistência de cada produção (mesmas regras do BI)
   const consistente = (r: Row): boolean => {
@@ -348,6 +353,11 @@ export async function resolvePainelCusto(
   }
   const colheitas = doProduto.map((r) => text(r.harvest_date)).filter(Boolean).sort();
 
+  const rawProcDate = (fetched[0] as Record<string, unknown> | undefined)?.data_processamento
+    ? String((fetched[0] as Record<string, unknown>).data_processamento)
+    : await getDataProcessamento(TABLE);
+  const dataProcessamento = rawProcDate ? formatDateTimePtBr(rawProcDate) : null;
+
   return {
     safras: safras.map((s) => ({ value: s, label: s })),
     culturas: culturas.map((c) => ({ value: c, label: titulo(c) })),
@@ -364,5 +374,6 @@ export async function resolvePainelCusto(
       producoesDescartadas: doProduto.length - custo.length,
       ultimaColheita: colheitas.length ? colheitas[colheitas.length - 1] : null,
     },
+    dataProcessamento,
   };
 }
