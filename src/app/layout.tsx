@@ -6,7 +6,7 @@ import "./painel-custo.css";
 
 export const metadata: Metadata = {
   title: "API Elabore | Labor Rural",
-  description: "Sistema de consulta e exportação de dados do Elabore — Labor Rural",
+  description: "Sistema de consulta e exportação de dados do Elabore - Labor Rural",
   icons: {
     icon: [
       { url: "/img/lr.png", type: "image/png" },

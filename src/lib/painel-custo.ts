@@ -1,6 +1,7 @@
 import "server-only";
 import type { PropertySummaryItem } from "./api";
 import { ETAPAS, SISTEMAS, SISTEMA_ROTULO, type EtapaKey, type PainelCustoData, type PainelCustoParams, type PorSistema, type Sistema, type DetalheLinha } from "./painel-custo-tipos";
+import { isInternalSession } from "./session";
 import { getElaboreColumns, queryElaboreAll } from "./supabase";
 
 // Painel de custos de forrageira: mesmas regras da tela 7 (Safra de Forrageiras) do BI gerencial,
@@ -141,16 +142,24 @@ export async function resolvePainelCusto(
     return vazio(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`);
   }
 
-  // Escopo: só fazendas que a API libera para o usuário (+ filtros Fazenda/Agroindústria)
-  let scope = properties.filter((p) => p.labor_rural_code);
-  if (params.prop) scope = scope.filter((p) => p.id_property === params.prop);
-  if (params.agro) scope = scope.filter((p) => p.id_agroindustry === params.agro);
-  const codes = [...new Set(scope.map((p) => plain(p.labor_rural_code!.trim().toUpperCase())))];
-  if (codes.length === 0) return vazio("Nenhuma fazenda disponível para os filtros escolhidos.");
+  // Escopo: só fazendas que a API libera para o usuário (+ filtros Fazenda/Agroindústria).
+  // Para sessão interna/global sem filtro de Fazenda/Agroindústria, consulta a tabela inteira.
+  const internal = await isInternalSession();
+  const hasGlobalScope =
+    internal || new Set(properties.map((p) => p.id_agroindustry).filter(Boolean)).size > 1;
+  const filters: [string, string][] = [];
+  if (!hasGlobalScope || params.prop || params.agro) {
+    let scope = properties.filter((p) => p.labor_rural_code);
+    if (params.prop) scope = scope.filter((p) => p.id_property === params.prop);
+    if (params.agro) scope = scope.filter((p) => p.id_agroindustry === params.agro);
+    const codes = [...new Set(scope.map((p) => plain(p.labor_rural_code!.trim().toUpperCase())))];
+    if (codes.length === 0) return vazio("Nenhuma fazenda disponível para os filtros escolhidos.");
+    filters.push(["labor_rural_code", `in.(${codes.join(",")})`]);
+  }
 
   const fetched = await queryElaboreAll({
     table: TABLE,
-    filters: [["labor_rural_code", `in.("${codes.join('","')}")`]],
+    filters,
     order: "labor_rural_code.asc,area_name.asc",
   });
 
@@ -287,9 +296,9 @@ export async function resolvePainelCusto(
     if (!acc.has(k)) {
       acc.set(k, {
         codigo: text(r.labor_rural_code),
-        fazenda: text(r.property_name) || "—",
-        produtor: text(r.producer_name) || "—",
-        consultor: text(r.consultant_name) || "—",
+        fazenda: text(r.property_name) || "-",
+        produtor: text(r.producer_name) || "-",
+        consultor: text(r.consultant_name) || "-",
         sistema: s ? SISTEMA_ROTULO[s] : "Não informado",
         plantada: 0,
         colhida: 0,

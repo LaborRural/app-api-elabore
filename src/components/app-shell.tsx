@@ -131,7 +131,13 @@ export default function AppShell({
   const currentTitle =
     currentSlug === "inicio"
       ? "Início"
-      : currentScreenDef?.title || "Elabore";
+      : SUBMENUS[currentSlug] && currentScreenDef
+        ? `${currentScreenDef.title} - ${SUBMENUS[currentSlug].find((s) => s.view === currentView)?.label ?? ""}`
+        : currentScreenDef?.title || "Elabore";
+
+  useEffect(() => {
+    document.title = `${currentTitle} | API Elabore | Labor Rural`;
+  }, [currentTitle]);
 
   return (
     <div className={`elabore-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
@@ -172,10 +178,10 @@ export default function AppShell({
         {/* Informações centrais do cabeçalho */}
         <div className="hidden sm:flex flex-col pl-2">
           <span className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--green-700)]">
-            BI LABOR RURAL · PORTAL DE CONSULTA E EXPORTAÇÃO
+            BI LABOR RURAL · {currentScreenDef ? currentScreenDef.group.toUpperCase() : "PORTAL DE CONSULTA E EXPORTAÇÃO"}
           </span>
           <span className="text-xs font-bold text-[var(--ink-strong)]">
-            Consumo de Dados da API Elabore
+            {currentSlug === "inicio" ? "Visão Geral - Dados do Elabore" : currentTitle}
           </span>
         </div>
 

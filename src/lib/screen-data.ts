@@ -302,7 +302,7 @@ export async function resolveScreenData(
             property_name:
               propPeriods?.property_name ??
               propMap.get(effectivePropertyId!)?.property_name ??
-              "—",
+              "-",
             year: per.year,
             month: per.month,
             period_label: `${String(per.month).padStart(2, "0")}/${per.year}`,
@@ -403,7 +403,7 @@ export async function resolveScreenData(
           const propName =
             (parent.property_name as string | undefined) ??
             (propId ? propMap.get(propId)?.property_name : undefined) ??
-            "—";
+            "-";
           const desc = String(parent[cfg.descKey] ?? parent.item_code ?? entryId.slice(0, 8));
 
           const instRes = await apiGetWithToken<Page<Record<string, unknown>>>(
@@ -630,9 +630,9 @@ function enrichRows(
       id_property: propId ?? row.id_property,
       id_agroindustry: agroId ?? row.id_agroindustry,
       property_name:
-        (row.property_name as string | undefined) ?? propInfo?.property_name ?? (propId ? "Propriedade não identificada" : "—"),
+        (row.property_name as string | undefined) ?? propInfo?.property_name ?? (propId ? "Propriedade não identificada" : "-"),
       agroindustry_name:
-        (row.agroindustry_name as string | undefined) ?? agroInfo?.name ?? "—",
+        (row.agroindustry_name as string | undefined) ?? agroInfo?.name ?? "-",
     };
   });
 }

@@ -70,6 +70,9 @@ export async function apiGet<T>(path: string, params?: QueryParams): Promise<T> 
   }
 }
 
+// Páginas 2+ em paralelo, em lotes, para não sobrecarregar a API (cada página leva vários segundos).
+const PAGE_CONCURRENCY = 4;
+
 /** Percorre todas as páginas (size=100) de um endpoint paginado. */
 export async function fetchAllPagesWithToken<T>(
   token: string,
@@ -77,25 +80,20 @@ export async function fetchAllPagesWithToken<T>(
   params?: QueryParams,
   maxPages = 50,
 ): Promise<{ items: T[]; total: number }> {
-  const all: T[] = [];
-  let page = 1;
-  let total = 0;
+  const first = await apiGetWithToken<Page<T>>(token, path, { ...params, page: 1, size: 100 });
+  const all: T[] = [...(first.items ?? first.data ?? [])];
+  const pages = Math.min(first.pages ?? 1, maxPages);
 
-  while (page <= maxPages) {
-    const res = await apiGetWithToken<Page<T>>(token, path, {
-      ...params,
-      page,
-      size: 100,
-    });
-    const batch = res.items ?? res.data ?? [];
-    all.push(...batch);
-    total = res.total ?? all.length;
-    const pages = res.pages ?? 1;
-    if (page >= pages || batch.length === 0) break;
-    page += 1;
+  for (let start = 2; start <= pages; start += PAGE_CONCURRENCY) {
+    const batch = await Promise.all(
+      Array.from({ length: Math.min(PAGE_CONCURRENCY, pages - start + 1) }, (_, i) =>
+        apiGetWithToken<Page<T>>(token, path, { ...params, page: start + i, size: 100 }),
+      ),
+    );
+    for (const res of batch) all.push(...(res.items ?? res.data ?? []));
   }
 
-  return { items: all, total };
+  return { items: all, total: first.total ?? all.length };
 }
 
 export async function fetchAllPages<T>(
@@ -148,33 +146,63 @@ export type AgroindustryItem = {
 // Catálogos (propriedades e agroindústrias) mudam pouco e a API leva de 6 a 16 s por página:
 // ficam em memória por usuário (chave = hash do token) e as páginas 2+ são pedidas em paralelo.
 const CATALOG_TTL_MS = 10 * 60 * 1000;
-const catalogCache = new Map<string, { items: unknown[]; expiresAt: number }>();
-const catalogInFlight = new Map<string, Promise<unknown[]>>();
+// Lançamentos mudam com mais frequência: cache curto, só para trocas de ano/recargas seguidas.
+const ENTRIES_TTL_MS = 5 * 60 * 1000;
+const memoryCache = new Map<string, { value: unknown; expiresAt: number }>();
+const memoryInFlight = new Map<string, Promise<unknown>>();
+
+/** Cache em memória por usuário (chave = hash do token), com deduplicação de chamadas simultâneas. */
+async function cachedLoad<T>(
+  token: string,
+  key: string,
+  ttlMs: number,
+  loader: () => Promise<T>,
+): Promise<T> {
+  const fullKey = `${createHash("sha256").update(token).digest("hex")}|${key}`;
+  const hit = memoryCache.get(fullKey);
+  if (hit && Date.now() < hit.expiresAt) return hit.value as T;
+  const pending = memoryInFlight.get(fullKey);
+  if (pending) return (await pending) as T;
+
+  const load = loader()
+    .then((value) => {
+      memoryCache.set(fullKey, { value, expiresAt: Date.now() + ttlMs });
+      if (memoryCache.size > 400) {
+        for (const [k, v] of memoryCache) if (Date.now() >= v.expiresAt) memoryCache.delete(k);
+      }
+      return value;
+    })
+    .finally(() => memoryInFlight.delete(fullKey));
+  memoryInFlight.set(fullKey, load);
+  return (await load) as T;
+}
 
 async function cachedCatalog<T>(token: string, path: string, maxPages: number): Promise<T[]> {
-  const key = `${createHash("sha256").update(token).digest("hex")}|${path}`;
-  const hit = catalogCache.get(key);
-  if (hit && Date.now() < hit.expiresAt) return hit.items as T[];
-  const pending = catalogInFlight.get(key);
-  if (pending) return (await pending) as T[];
-
-  const load = (async () => {
-    const first = await apiGetWithToken<Page<T>>(token, path, { page: 1, size: 100 });
-    const pages = Math.min(first.pages ?? 1, maxPages);
-    const rest = await Promise.all(
-      Array.from({ length: Math.max(0, pages - 1) }, (_, i) =>
-        apiGetWithToken<Page<T>>(token, path, { page: i + 2, size: 100 }),
-      ),
-    );
-    const items = [first, ...rest].flatMap((p) => p.items ?? p.data ?? []);
-    catalogCache.set(key, { items, expiresAt: Date.now() + CATALOG_TTL_MS });
-    if (catalogCache.size > 200) {
-      for (const [k, v] of catalogCache) if (Date.now() >= v.expiresAt) catalogCache.delete(k);
-    }
+  return cachedLoad(token, path, CATALOG_TTL_MS, async () => {
+    const { items } = await fetchAllPagesWithToken<T>(token, path, {}, maxPages);
     return items;
-  })().finally(() => catalogInFlight.delete(key));
-  catalogInFlight.set(key, load);
-  return (await load) as T[];
+  });
+}
+
+/** Todas as páginas de um endpoint de lançamentos no período, com cache curto em memória. */
+export async function getPeriodEntriesCached<T>(
+  token: string,
+  path: string,
+  start: string,
+  end: string,
+  maxPages: number,
+): Promise<{ items: T[]; total: number }> {
+  return cachedLoad(token, `${path}?start=${start}&end=${end}&max=${maxPages}`, ENTRIES_TTL_MS, () =>
+    fetchAllPagesWithToken<T>(token, path, { start, end }, maxPages),
+  );
+}
+
+/** Contagem (campo total) de um endpoint paginado, com cache em memória. */
+export async function getTotalCached(token: string, path: string): Promise<number> {
+  return cachedLoad(token, `${path}#total`, CATALOG_TTL_MS, async () => {
+    const res = await apiGetWithToken<Page<unknown>>(token, path, { page: 1, size: 1 });
+    return res.total ?? 0;
+  });
 }
 
 /**
@@ -187,8 +215,8 @@ export async function getPropertiesCatalogChecked(
   try {
     const [items, producers] = await Promise.all([
       token
-        ? cachedCatalog<PropertySummaryItem>(token, "/properties", 10)
-        : fetchAllPages<PropertySummaryItem>("/properties", {}, 10).then((r) => r.items),
+        ? cachedCatalog<PropertySummaryItem>(token, "/properties", 50)
+        : fetchAllPages<PropertySummaryItem>("/properties", {}, 50).then((r) => r.items),
       getProducerNames(),
     ]);
     return {

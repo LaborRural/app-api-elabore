@@ -70,9 +70,9 @@ export async function resolvePainelAnual(
     notice,
   });
 
-  const allowed = properties.filter((p) => p.labor_rural_code);
   const property =
-    allowed.find((p) => p.id_property === params.prop) ?? (allowed.length === 1 ? allowed[0] : null);
+    properties.find((p) => p.id_property === params.prop) ??
+    (properties.length === 1 ? properties[0] : null);
   if (!property) return empty("Escolha uma fazenda no filtro para abrir o painel.");
 
   const columns = await getElaboreColumns(TABLE);
@@ -80,8 +80,11 @@ export async function resolvePainelAnual(
     return empty(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`, property);
   }
 
-  const code = property.labor_rural_code!.trim().toUpperCase();
-  const fetched = await queryElaboreAll({ table: TABLE, filters: [[CODE_COLUMN, `eq.${plain(code)}`]], order: "id.asc" });
+  const code = property.labor_rural_code?.trim().toUpperCase();
+  const propFilter: [string, string] = code
+    ? [CODE_COLUMN, `eq.${plain(code)}`]
+    : ["id_property", `eq.${plain(property.id_property)}`];
+  const fetched = await queryElaboreAll({ table: TABLE, filters: [propFilter], order: "id.asc" });
 
   // A mesma fazenda pode vir com a janela repetida (regravação do notebook ou outra propriedade
   // com o mesmo código): fica só a linha da propriedade escolhida e, havendo repetição, a mais recente.

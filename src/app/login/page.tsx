@@ -4,7 +4,7 @@ import LoginForm from "./login-form";
 
 export const metadata: Metadata = {
   title: "API Elabore | Labor Rural",
-  description: "Acesse o sistema Elabore — Labor Rural",
+  description: "Acesse o sistema Elabore - Labor Rural",
   icons: {
     icon: [
       { url: "/img/lr.png", type: "image/png" },

@@ -149,7 +149,7 @@ export default function PainelMensal({ data: fullData, properties, agroindustrie
       )}
       <div className="painel-head">
         <div>
-          <h1 className="page-title">Indicadores Mensais</h1>
+          <h1 className="page-title">Indicadores Mensais - Painel da Fazenda</h1>
           <p className="page-subtitle">Painel da fazenda: meses nas colunas, indicadores nas linhas</p>
         </div>
       </div>
@@ -205,7 +205,7 @@ export default function PainelMensal({ data: fullData, properties, agroindustrie
             {KPIS.map((k) => {
               const row = findRow(data, k.key);
               const last = row?.values[row.values.length - 1] ?? null;
-              const show = (v: number | null | undefined) => (v == null ? "—" : formatDecimal(v, 2));
+              const show = (v: number | null | undefined) => (v == null ? "-" : formatDecimal(v, 2));
               return (
                 <SummaryCard
                   key={k.key}

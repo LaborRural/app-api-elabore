@@ -58,7 +58,7 @@ function statusClass(status: string | null) {
 }
 
 function yoyText(last: number | null, base: number | null | undefined): string {
-  if (last === null || base == null || Math.abs(base) < 1e-9) return "—";
+  if (last === null || base == null || Math.abs(base) < 1e-9) return "-";
   const d = ((last - base) / Math.abs(base)) * 100;
   return `${d > 0 ? "+" : ""}${formatDecimal(d, 1)}%`;
 }
@@ -76,7 +76,7 @@ export default function PainelAnual({ data, properties, agroindustries, exportHr
     <div className="flex flex-col gap-3">
       <div className="painel-head">
         <div>
-          <h1 className="page-title">Indicadores Anuais</h1>
+          <h1 className="page-title">Indicadores Anuais - Painel Anual</h1>
           <p className="page-subtitle">Painel anual da fazenda: janelas móveis de 12 meses, identificadas pelo mês em que terminam</p>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function PainelAnual({ data, properties, agroindustries, exportHr
             {KPIS.map((k) => {
               const last = s(k.key)[n - 1] ?? null;
               const base = data.base?.values[k.key] ?? null;
-              const text = last === null ? "—" : k.money ? formatCurrencyCompact(last) : formatDecimal(last, k.decimals);
+              const text = last === null ? "-" : k.money ? formatCurrencyCompact(last) : formatDecimal(last, k.decimals);
               return (
                 <SummaryCard
                   key={k.key}
@@ -154,11 +154,11 @@ export default function PainelAnual({ data, properties, agroindustries, exportHr
               id="rentabilidade-anual"
               facetHeight={110}
               title="Rentabilidade e margem"
-              takeaway={[rangeText("Margem líquida", s("net_margin_liter_annual"), labels, 2, "R$/L "), rangeText("Rentabilidade", s("capital_return_rate_annual"), labels, 1)].filter(Boolean).join(" · ") || "Sem dados de rentabilidade no período"}
+              takeaway={[rangeText("Margem líquida", s("net_margin_liter_annual"), labels, 2, "R$/L "), rangeText("Lucratividade", s("profitability_annual"), labels, 1), rangeText("Remuneração do capital", s("capital_return_rate_annual"), labels, 1)].filter(Boolean).join(" · ") || "Sem dados de rentabilidade no período"}
               labels={labels}
               facets={[
                 { name: "Margem líquida unitária", unit: "R$/litro", color: CUSTO[0], values: s("net_margin_liter_annual"), kind: "line", decimals: 2 },
-                { name: "Rentabilidade", unit: "% ao ano", color: CUSTO[1], values: s("capital_return_rate_annual"), kind: "line", decimals: 1 },
+                { name: "Lucratividade operacional", unit: "%", color: CUSTO[1], values: s("profitability_annual"), kind: "line", decimals: 1, extra: [{ name: "Remuneração do capital com terra (% ao ano)", color: "#e28a10", values: s("capital_return_rate_annual") }] },
               ]}
             />
             <PainelChart

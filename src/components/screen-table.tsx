@@ -111,6 +111,12 @@ function PageJump({
   );
 }
 
+const TABELA_SUBTITLE_MAP: Record<string, string> = {
+  "indicadores-mensais": "Indicadores Mensais - Tabela de Indicadores",
+  "indicadores-anuais": "Indicadores Anuais - Tabela de Médias",
+  "custo-forrageira": "Custo de Forrageira - Tabela de Custos",
+};
+
 export default function ScreenTable({
   screen,
   activeTabId,
@@ -182,7 +188,7 @@ export default function ScreenTable({
       {/* CABEÇALHO DA TELA + SELETOR DE ABAS */}
       <div className="flex flex-wrap items-start justify-between gap-2.5">
         <div>
-          <h1 className="page-title">{screen.title}</h1>
+          <h1 className="page-title">{TABELA_SUBTITLE_MAP[screen.slug] ?? screen.title}</h1>
           {screen.subtitle && <p className="page-subtitle">{screen.subtitle}</p>}
         </div>
         {headerExtra}
@@ -335,7 +341,7 @@ export default function ScreenTable({
                         if (!value) {
                           return (
                             <td key={col.key} className={alignClass}>
-                              —
+                              -
                             </td>
                           );
                         }
@@ -362,7 +368,7 @@ export default function ScreenTable({
                             ) : raw === false ? (
                               <span className="badge badge-neutral">Não</span>
                             ) : (
-                              "—"
+                              "-"
                             )}
                           </td>
                         );
@@ -375,7 +381,7 @@ export default function ScreenTable({
                         if (!entryId) {
                           return (
                             <td key={col.key} className="text-center text-[var(--muted)]">
-                              —
+                              -
                             </td>
                           );
                         }
@@ -409,7 +415,7 @@ export default function ScreenTable({
                               ? "font-semibold text-[var(--ink-strong)]"
                               : ""
                           }`}
-                          title={formatted !== "—" ? formatted : undefined}
+                          title={formatted !== "-" ? formatCellValue(raw, col.type, true) : undefined}
                         >
                           {formatted}
                         </td>

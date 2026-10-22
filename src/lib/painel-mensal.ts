@@ -77,9 +77,9 @@ export async function resolvePainelMensal(
   });
 
   // Fazenda: a escolhida no filtro ou, se o usuário só enxerga uma, essa.
-  const allowed = properties.filter((p) => p.labor_rural_code);
   const property =
-    allowed.find((p) => p.id_property === params.prop) ?? (allowed.length === 1 ? allowed[0] : null);
+    properties.find((p) => p.id_property === params.prop) ??
+    (properties.length === 1 ? properties[0] : null);
   if (!property) {
     return empty("Escolha uma fazenda no filtro para abrir o painel.");
   }
@@ -89,8 +89,10 @@ export async function resolvePainelMensal(
     return empty(`A tabela elabore.${TABLE} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`, property);
   }
 
-  const code = property.labor_rural_code!.trim().toUpperCase();
-  const filters: [string, string][] = [[CODE_COLUMN, `eq.${plain(code)}`]];
+  const code = property.labor_rural_code?.trim().toUpperCase();
+  const filters: [string, string][] = code
+    ? [[CODE_COLUMN, `eq.${plain(code)}`]]
+    : [["id_property", `eq.${plain(property.id_property)}`]];
   const year = params.ano && /^\d{4}$/.test(params.ano) ? Number(params.ano) : null;
   if (year) filters.push(["reference_month", `gte.${year}-01-01`], ["reference_month", `lt.${year + 1}-01-01`]);
 

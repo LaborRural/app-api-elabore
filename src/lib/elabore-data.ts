@@ -2,12 +2,16 @@ import "server-only";
 import type { AgroindustryItem, PropertySummaryItem } from "./api";
 import type { ResolvedScreenData, ScreenFilterParams } from "./screen-data";
 import type { ColumnDef, ElaboreSourceDef, ScreenDef, ScreenTabDef } from "./screens";
+import { isInternalSession } from "./session";
 import { getElaboreColumns, queryElabore, queryElaboreAll, type ElaboreColumn } from "./supabase";
 
 // Telas de Indicadores: schema "elabore" do Supabase, filtrado e paginado no banco.
 // Só entram fazendas cujo código (labor_rural_code) está no catálogo de propriedades
 // que a API Elabore devolve para o usuário logado: cada agroindústria continua vendo
 // apenas as próprias fazendas, mesmo que manipule os filtros da URL.
+// Para sessões internas da equipe Labor Rural (ou escopo global multi-agroindústria) sem
+// filtro de Propriedade/Agroindústria ativo, a consulta traz 100% da tabela no Supabase,
+// incluindo registros sem labor_rural_code ou com códigos históricos fora de /properties.
 
 // annual_period vem do notebook no formato "Apr/25-Mar/26" (mês em inglês).
 const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -22,9 +26,10 @@ function slug(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
-/** Valor seguro dentro de in.(...) / or=(...) do PostgREST. */
+/** Valor seguro dentro de in.(...) / or=(...) do PostgREST; evita aspas quando é código simples. */
 function quote(value: string): string {
-  return `"${value.replace(/["\\]/g, "")}"`;
+  const clean = value.replace(/["\\]/g, "");
+  return /^[A-Za-z0-9_-]+$/.test(clean) ? clean : `"${clean}"`;
 }
 
 function parseMonths(mes?: string): number[] {
@@ -102,14 +107,32 @@ export async function resolveElaboreScreen(
     return empty(`A tabela elabore.${source.table} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`);
   }
 
-  // Escopo: códigos das propriedades que a API libera para o usuário (+ filtros Propriedade/Agroindústria)
-  let scope = properties.filter((p) => p.labor_rural_code);
-  if (rawParams.prop) scope = scope.filter((p) => p.id_property === rawParams.prop);
-  if (rawParams.agro) scope = scope.filter((p) => p.id_agroindustry === rawParams.agro);
-  const codes = [...new Set(scope.map((p) => p.labor_rural_code!.trim().toUpperCase()))];
-  if (codes.length === 0) return empty();
+  // Escopo: usuários internos/globais sem filtro de Propriedade/Agroindústria consultam a base
+  // completa (incluindo registros sem código LR ou com código histórico fora de /properties).
+  const internal = await isInternalSession();
+  const hasGlobalScope =
+    internal || new Set(properties.map((p) => p.id_agroindustry).filter(Boolean)).size > 1;
 
-  const filters: [string, string][] = [[source.codeColumn, `in.(${codes.map(quote).join(",")})`]];
+  const filters: [string, string][] = [];
+  if (!hasGlobalScope || rawParams.prop || rawParams.agro) {
+    let scope = properties;
+    if (rawParams.prop) scope = scope.filter((p) => p.id_property === rawParams.prop);
+    if (rawParams.agro) scope = scope.filter((p) => p.id_agroindustry === rawParams.agro);
+    const codes = [
+      ...new Set(
+        scope
+          .filter((p) => p.labor_rural_code)
+          .map((p) => p.labor_rural_code!.trim().toUpperCase()),
+      ),
+    ];
+    if (codes.length > 0) {
+      filters.push([source.codeColumn, `in.(${codes.map(quote).join(",")})`]);
+    } else if (rawParams.prop && scope.length > 0 && allColumns.some((c) => c.key === "id_property")) {
+      filters.push(["id_property", `eq.${quote(rawParams.prop)}`]);
+    } else {
+      return empty();
+    }
+  }
   const orGroups: string[] = [];
 
   // Período (Ano / Mês)

@@ -104,6 +104,7 @@ let catalogInFlight: Promise<Map<string, ElaboreColumn[]>> | null = null;
 
 function columnType(column: string, label: string, pgFormat: string | undefined): ColumnType {
   if (CONSISTENCY_COLUMNS.has(column)) return "consistencia";
+  if (column === "violated_consistency_criteria" || /^detalhamento/i.test(label)) return "inconsistencia";
   if (pgFormat === "boolean") return "boolean";
   if (pgFormat?.startsWith("timestamp") || pgFormat === "date") {
     return column === "reference_month" ? "month" : "date";
@@ -144,7 +145,7 @@ async function loadCatalog(): Promise<Map<string, ElaboreColumn[]>> {
       align:
         type === "currency" || type === "number" || type === "percent"
           ? "right"
-          : type === "text"
+          : type === "text" || type === "inconsistencia"
             ? "left"
             : "center",
       group: d.grupo ?? "Outros",

@@ -25,7 +25,7 @@ export async function generateStyledXlsxBuffer(
   const exportCols = columns.filter((c) => c.type !== "parcelas_link");
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Labor Rural — Elabore";
+  workbook.creator = "Labor Rural - Elabore";
   workbook.created = new Date();
 
   const safeSheetName =
@@ -122,6 +122,8 @@ export async function generateStyledXlsxBuffer(
         return raw === true ? "Ativo" : raw === false ? "Inativo" : String(raw);
       }
 
+      if (col.type === "inconsistencia") return formatCellValue(raw, col.type, true);
+
       return String(raw);
     });
 
@@ -178,7 +180,7 @@ export async function generateStyledXlsxBuffer(
     let maxLen = col.label.length;
     for (let rIdx = 0; rIdx < sampleLimit; rIdx++) {
       const formatted = formatCellValue(getNestedValue(rows[rIdx], col.key), col.type);
-      if (formatted && formatted !== "—") {
+      if (formatted && formatted !== "-") {
         maxLen = Math.max(maxLen, formatted.length);
       }
     }
@@ -200,7 +202,7 @@ export function generateCsvContent(
   const exportCols = columns.filter((c) => c.type !== "parcelas_link");
 
   const escapeCsv = (val: string): string => {
-    const clean = val === "—" ? "" : val;
+    const clean = val === "-" ? "" : val;
     if (/[;"\r\n]/.test(clean)) {
       return `"${clean.replace(/"/g, '""')}"`;
     }
@@ -212,7 +214,7 @@ export function generateCsvContent(
     exportCols
       .map((col) => {
         const raw = getNestedValue(row, col.key);
-        const formatted = formatCellValue(raw, col.type);
+        const formatted = formatCellValue(raw, col.type, true);
         return escapeCsv(formatted);
       })
       .join(";"),

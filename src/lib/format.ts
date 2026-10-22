@@ -1,8 +1,9 @@
+import { humanizarInconsistencias } from "./inconsistencias";
 import type { ColumnType } from "./screens";
 
 /** Formata uma string ISO (YYYY-MM-DD...) para dd/mm/aaaa em pt-BR. */
 export function formatDatePtBr(val: unknown): string {
-  if (!val) return "—";
+  if (!val) return "-";
   const str = String(val);
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
   if (m) {
@@ -71,8 +72,8 @@ export function friendlyText(val: string, loose = false): string {
 }
 
 /** Formata valores de célula para exibição em tela e exportação CSV. */
-export function formatCellValue(val: unknown, type: ColumnType = "text"): string {
-  if (val === null || val === undefined || val === "") return "—";
+export function formatCellValue(val: unknown, type: ColumnType = "text", completo = false): string {
+  if (val === null || val === undefined || val === "") return "-";
 
   switch (type) {
     case "date":
@@ -113,9 +114,11 @@ export function formatCellValue(val: unknown, type: ColumnType = "text"): string
       })}%`;
     }
     case "boolean":
-      return val === true ? "Sim" : val === false ? "Não" : "—";
+      return val === true ? "Sim" : val === false ? "Não" : "-";
     case "status":
       return val === true ? "Ativo" : val === false ? "Inativo" : String(val);
+    case "inconsistencia":
+      return humanizarInconsistencias(String(val), completo);
     case "codigo":
       return typeof val === "string" ? friendlyText(val, true) : String(val);
     default:

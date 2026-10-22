@@ -21,6 +21,8 @@ export type Facet = {
   values: (number | null)[];
   kind: "line" | "bar";
   decimals?: number;
+  /** Outras linhas na mesma escala, desenhadas no mesmo painel (só para kind "line"). */
+  extra?: { name: string; color: string; values: (number | null)[] }[];
 };
 
 type Props = {
@@ -59,9 +61,11 @@ function mean(values: (number | null)[]): number | null {
 function FacetPlot({ facet, labels, last, height, labelAll }: { facet: Facet; labels: string[]; last: boolean; height: number; labelAll: boolean }) {
   const decimals = facet.decimals ?? 2;
   const avg = mean(facet.values);
+  const lines = useMemo(() => [{ name: facet.name, color: facet.color, values: facet.values }, ...(facet.extra ?? [])], [facet]);
+  const multi = lines.length > 1;
 
   const options = useMemo<ApexOptions>(() => {
-    const valid = facet.values.filter((v): v is number => v !== null);
+    const valid = lines.flatMap((l) => l.values).filter((v): v is number => v !== null);
     const lo = valid.length ? Math.min(...valid) : 0;
     const hi = valid.length ? Math.max(...valid) : 1;
     const pad = Math.max((hi - lo) * 0.25, Math.abs(hi) * 0.05, 1e-6);
@@ -78,7 +82,32 @@ function FacetPlot({ facet, labels, last, height, labelAll }: { facet: Facet; la
     const marks = labelAll
       ? facet.values.map((v, i) => (v !== null && i % step === 0 ? i : -1)).filter((i) => i >= 0)
       : [...new Set([iMax, iMin])].filter((i) => i >= 0 && valid.length > 1);
-    const points = marks.map((i) => {
+    // Várias linhas no mesmo painel: rótulo no maior e no menor de cada uma; em cada mês o valor mais
+    // alto vai acima do ponto e o mais baixo abaixo dele, para um rótulo nunca cobrir o outro.
+    const multiPoints = multi
+      ? [
+          ...new Set(
+            lines.flatMap((l) => {
+              const v = l.values.filter((x): x is number => x !== null);
+              return v.length > 1 ? [l.values.indexOf(Math.max(...v)), l.values.indexOf(Math.min(...v))] : [];
+            }),
+          ),
+        ].flatMap((i) => {
+          const at = lines.flatMap((l, j) => (l.values[i] === null ? [] : [{ j, v: l.values[i] as number }]));
+          return at.map(({ j, v }) => ({
+            x: labels[i],
+            y: v,
+            marker: { size: 0 },
+            label: {
+              text: fmt(v, decimals),
+              offsetY: at.every((o) => o.j === j || v >= o.v) ? -8 : 18,
+              borderWidth: 0,
+              style: { background: "transparent", color: lines[j].color, fontSize: "11px", fontWeight: 700 },
+            },
+          }));
+        })
+      : [];
+    const points = multi ? multiPoints : marks.map((i) => {
       const v = facet.values[i] as number;
       // Barra: valor em branco e negrito dentro da barra, com folga do topo. Barra baixa demais para
       // caber o texto com essa folga: o valor sobe para cima da barra, em cinza-escuro.
@@ -106,7 +135,7 @@ function FacetPlot({ facet, labels, last, height, labelAll }: { facet: Facet; la
         animations: { enabled: false },
         parentHeightOffset: 0,
       },
-      colors: [facet.color],
+      colors: lines.map((l) => l.color),
       legend: { show: false },
       dataLabels: { enabled: false },
       stroke: facet.kind === "line" ? { width: 2, curve: "straight" } : { width: 0 },
@@ -134,27 +163,39 @@ function FacetPlot({ facet, labels, last, height, labelAll }: { facet: Facet; la
         labels: { minWidth: Y_LABEL_WIDTH, maxWidth: Y_LABEL_WIDTH, style: { colors: [AXIS_Y], fontSize: "11px" }, formatter: (v) => fmt(v, decimals > 1 ? 1 : decimals) },
       },
       annotations: {
-        yaxis: avg === null ? [] : [{ y: avg, borderColor: facet.color, strokeDashArray: 4, opacity: 0.55 }],
+        yaxis: lines.flatMap((l) => {
+          const a = mean(l.values);
+          return a === null ? [] : [{ y: a, borderColor: l.color, strokeDashArray: 4, opacity: 0.55 }];
+        }),
         points,
       },
-      tooltip: { shared: true, intersect: false, y: { formatter: (v) => (v == null ? "—" : `${fmt(v, decimals)} ${facet.unit}`) } },
+      tooltip: { shared: true, intersect: false, y: { formatter: (v) => (v == null ? "-" : `${fmt(v, decimals)} ${facet.unit}`) } },
       noData: { text: "Sem dados no período" },
     };
-  }, [facet, labels, last, decimals, avg, height, labelAll]);
+  }, [facet, lines, multi, labels, last, decimals, height, labelAll]);
 
-  const hasData = facet.values.some((v) => v !== null);
+  const hasData = lines.some((l) => l.values.some((v) => v !== null));
 
   return (
     <div className="painel-facet">
       <div className="painel-facet-head">
         <span className="painel-facet-name">
           <i className="legend-swatch" style={{ background: facet.color }} />
-          {facet.name} <small>({facet.unit})</small>
+          {facet.name}
+          {facet.extra?.map((l) => (
+            <span key={l.name} style={{ marginLeft: 12 }}>
+              <i className="legend-swatch" style={{ background: l.color }} />
+              {l.name}
+            </span>
+          ))}{" "}
+          <small>({facet.unit})</small>
         </span>
-        <span className="painel-facet-avg">média {avg === null ? "—" : fmt(avg, decimals)}</span>
+        <span className="painel-facet-avg">
+          {multi ? lines.map((l) => `média ${fmt(mean(l.values) ?? 0, decimals)}`).join(" · ") : `média ${avg === null ? "-" : fmt(avg, decimals)}`}
+        </span>
       </div>
       {hasData ? (
-        <Chart options={options} series={[{ name: facet.name, data: facet.values }]} type={facet.kind === "bar" ? "bar" : "line"} height={height + (last ? 22 : 0)} />
+        <Chart options={options} series={lines.map((l) => ({ name: l.name, data: l.values }))} type={facet.kind === "bar" ? "bar" : "line"} height={height + (last ? 22 : 0)} />
       ) : (
         <div className="painel-chart-empty" style={{ height }}>Sem dados no período</div>
       )}

@@ -97,7 +97,7 @@ export function CardActionButton({ className = "", type = "button", ...rest }: B
 
 export type SummaryCardProps = {
   label: string;
-  /** Valor já formatado; sem dado, passe "—" (nunca 0 inventado). */
+  /** Valor já formatado; sem dado, passe "-" (nunca 0 inventado). */
   value: ReactNode;
   /** Ícone 18px (ex.: <TbCash /> do react-icons/tb ou um <svg>). */
   icon?: ReactNode;

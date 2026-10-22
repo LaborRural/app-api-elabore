@@ -91,7 +91,7 @@ function buildCombo(series: ChartSeries[], labels: string[], unit: string, decim
       { seriesName: line.name, opposite: true, show: false, min: lineAxisMin, max: lineAxisMax },
     ],
     annotations: { points },
-    tooltip: { shared: true, intersect: false, y: { formatter: (v) => (v == null ? "—" : fmt(v, decimals)) } },
+    tooltip: { shared: true, intersect: false, y: { formatter: (v) => (v == null ? "-" : fmt(v, decimals)) } },
     noData: { text: "Sem dados no período" },
   };
   return {
@@ -153,7 +153,7 @@ export default function PainelChart({ title, subtitle, unit, labels, series, kin
         yaxis: dataMin < 0 ? [{ y: 0, borderColor: AXIS_Y, opacity: 0.7 }] : [],
         points: pointAnnotations,
       },
-      tooltip: { shared: true, intersect: false, y: { formatter: (v) => (v == null ? "—" : `${fmt(v, decimals)} ${unit}`) } },
+      tooltip: { shared: true, intersect: false, y: { formatter: (v) => (v == null ? "-" : `${fmt(v, decimals)} ${unit}`) } },
       noData: { text: "Sem dados no período" },
     };
     return { options, apexSeries };

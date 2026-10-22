@@ -28,7 +28,7 @@ const GRID = "#e5e7eb";
 const LABEL = "#374151";
 
 const nf = (v: number | null | undefined, d = 0) =>
-  v === null || v === undefined ? "—" : v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  v === null || v === undefined ? "-" : v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
 const fazLabel = (n: number, curto = false) => `${nf(n)} ${curto ? "faz." : n === 1 ? "fazenda" : "fazendas"}`;
 
 type Props = {
@@ -46,7 +46,7 @@ export default function PainelCusto({ data, properties, agroindustries, fullShee
   const [composicao, setComposicao] = useState(false);
 
   const { sel } = { sel: data.selecao };
-  const nomeProduto = data.produtos.filter((p) => sel.produto.includes(p.value)).map((p) => p.label).join(" e ") || "—";
+  const nomeProduto = data.produtos.filter((p) => sel.produto.includes(p.value)).map((p) => p.label).join(" e ") || "-";
   const ciclo = "1ª safra";
   const sufixoBase = data.custoBase === "DEFLACIONADO" ? " · deflacionado (IGP-DI)" : "";
 
@@ -69,7 +69,7 @@ export default function PainelCusto({ data, properties, agroindustries, fullShee
     <div className={`flex flex-col gap-3 painel-custo${pending ? " is-pending" : ""}`}>
       <div className="painel-head">
         <div>
-          <h1 className="page-title">Custo de Forrageira</h1>
+          <h1 className="page-title">Custo de Forrageira - Painel de Custos</h1>
           <p className="page-subtitle">Painel de custos por sistema de plantio · mesmas regras da tela 7 do BI gerencial</p>
         </div>
       </div>
@@ -234,7 +234,8 @@ function SistemaPainel({ data, produto, ciclo }: { data: PainelCustoData; produt
       {data.sistema.areaTotal > 0 ? (
         <div className="pc-sistema">
           <div className="pc-donut">
-            <Chart type="donut" height={215} options={options} series={itens.map((i) => i.area)} />
+            {/* key: o ApexCharts não redesenha o total do centro no updateOptions; recria a rosca quando os dados mudam */}
+            <Chart key={itens.map((i) => i.area).join("|")} type="donut" height={215} options={options} series={itens.map((i) => i.area)} />
           </div>
           <div className="pc-sistema-lado">
             <ul className="pc-legenda">
@@ -453,7 +454,7 @@ function ResumoSistema({ porSistema, data }: { porSistema: PorSistema[]; data: P
     { key: "sistema", label: "Sistema de plantio" },
     { key: "fazendas", label: "Fazendas", align: "right" },
     { key: "area_plantada", label: "Área plantada (ha)", align: "right", decimals: 1 },
-    { key: "pct_area", label: "% da área", align: "right", format: (v) => (v === null ? "—" : `${v}%`) },
+    { key: "pct_area", label: "% da área", align: "right", format: (v) => (v === null ? "-" : `${v}%`) },
     { key: "area_colhida", label: "Área colhida (ha)", align: "right", decimals: 1 },
     { key: "toneladas", label: "Toneladas", align: "right" },
     { key: "t_ha", label: "Produtividade (t/ha)", align: "right", decimals: 1 },
@@ -475,7 +476,7 @@ function DetalheFazendas({ detalhe }: { detalhe: DetalheLinha[] }) {
     { key: "consultor", label: "Consultor(a)" },
     { key: "sistema", label: "Sistema", align: "center" },
     { key: "area_plantada_ha", label: "Área plantada (ha)", align: "right", decimals: 1 },
-    { key: "pct_area", label: "% da área", align: "right", format: (v) => (v === null ? "—" : `${nf(v as number, 2)}%`) },
+    { key: "pct_area", label: "% da área", align: "right", format: (v) => (v === null ? "-" : `${nf(v as number, 2)}%`) },
     { key: "area_colhida_ha", label: "Área colhida (ha)", align: "right", decimals: 1 },
     { key: "toneladas", label: "Toneladas", align: "right", decimals: 1 },
     { key: "t_ha", label: "Produtividade (t/ha)", align: "right", decimals: 1 },

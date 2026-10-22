@@ -35,7 +35,7 @@ function norm(v: string): string {
 function show<T>(col: TabelaColuna<T>, row: T): string {
   const v = row[col.key];
   if (col.format) return col.format(v, row);
-  if (v === null || v === undefined || v === "") return "—";
+  if (v === null || v === undefined || v === "") return "-";
   if (typeof v === "number") {
     const d = col.decimals ?? 0;
     return v.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -93,7 +93,7 @@ export default function PainelCustoTabela<T extends object>({ title, exportName,
 
   function exportCsv() {
     const esc = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const body = visible.map((row) => columns.map((c) => esc(show(c, row) === "—" ? "" : show(c, row))).join(";"));
+    const body = visible.map((row) => columns.map((c) => esc(show(c, row) === "-" ? "" : show(c, row))).join(";"));
     const csv = `﻿${[columns.map((c) => esc(c.label)).join(";"), ...body].join("\r\n")}`;
     const now = new Date();
     const p = (n: number) => String(n).padStart(2, "0");

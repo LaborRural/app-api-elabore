@@ -19,6 +19,7 @@ export type ColumnType =
   | "boolean"
   | "status"
   | "consistencia"
+  | "inconsistencia"
   | "codigo"
   | "parcelas_link";
 
