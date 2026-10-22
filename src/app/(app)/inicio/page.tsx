@@ -5,16 +5,16 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import {
   ApiAuthError,
-  getAgroindustriesCatalog,
+  getAreasCatalog,
   getEntriesHeadCached,
-  getPeriodEntriesCached,
+  getPlantedCulturesCatalog,
   getPropertiesCatalog,
-  getTotalCached,
 } from "@/lib/api";
 import { formatCellValue } from "@/lib/format";
 import { resolvePeriodRange } from "@/lib/screen-data";
 import { MENU_GROUPS, SCREEN_LIST } from "@/lib/screens";
 import { getToken } from "@/lib/session";
+import { getMilkProductionTotal } from "@/lib/supabase";
 
 type SearchProps = {
   searchParams: Promise<{ ano?: string; mes?: string }>;
@@ -23,11 +23,6 @@ type SearchProps = {
 const YEARS = ["todos", "2026", "2025", "2024", "2023", "2022"];
 // Ano mais recente da lista: abre por padrão, em vez de "todos".
 const DEFAULT_YEAR = YEARS[1];
-// A API limita size a 100 e não tem endpoint de soma: o total em R$ só é calculado quando cabe
-// em ENTRIES_MAX_PAGES páginas; acima disso mostra só a contagem (soma parcial enganaria).
-const ENTRIES_MAX_PAGES = 30;
-const API_PAGE_SIZE = 100;
-
 export const metadata: Metadata = {
   title: "Início | API Elabore | Labor Rural",
 };
@@ -184,29 +179,14 @@ function InicioDashboard({ searchParams }: SearchProps) {
         <Suspense fallback={<KpiSkeleton icon="home_work" label="Propriedades" />}>
           <PropertiesKpi />
         </Suspense>
-        <Suspense fallback={<KpiSkeleton icon="factory" label="Agroindústrias" />}>
-          <AgroindustriesKpi />
+        <Suspense fallback={<KpiSkeleton icon="map" label="Área total" />}>
+          <AreaTotalKpi />
         </Suspense>
-        <Suspense fallback={<KpiSkeleton icon="map" label="Áreas Rurais" />}>
-          <AreasKpi />
+        <Suspense fallback={<KpiSkeleton icon="grass" label="Área plantada" />}>
+          <AreaPlantadaKpi />
         </Suspense>
-        <Suspense fallback={<KpiSkeleton icon="trending_up" label="Receitas no Período" />}>
-          <EntriesKpi
-            searchParams={searchParams}
-            path="/revenue"
-            dateKey="reference_month"
-            icon="trending_up"
-            label="Receitas no Período"
-          />
-        </Suspense>
-        <Suspense fallback={<KpiSkeleton icon="trending_down" label="Despesas no Período" />}>
-          <EntriesKpi
-            searchParams={searchParams}
-            path="/expenseentry/changes"
-            dateKey="entry_date"
-            icon="trending_down"
-            label="Despesas no Período"
-          />
+        <Suspense fallback={<KpiSkeleton icon="water_drop" label="Produção total de leite" />}>
+          <ProducaoKpi searchParams={searchParams} />
         </Suspense>
       </section>
 
@@ -245,85 +225,95 @@ async function PropertiesKpi() {
   });
   const active = properties.filter((p) => p.is_active).length;
   return (
-    <MetricCard icon="home_work" label="Propriedades" value={properties.length.toLocaleString("pt-BR")}>
-      <small>{active} ativas na base</small>
+    <MetricCard icon="home_work" label="Propriedades ativas" value={active.toLocaleString("pt-BR")}>
+      <small>{properties.length.toLocaleString("pt-BR")} na base</small>
     </MetricCard>
   );
 }
 
-async function AgroindustriesKpi() {
-  const token = await authedToken();
-  const agroindustries = await getAgroindustriesCatalog(token);
-  return (
-    <MetricCard icon="factory" label="Agroindústrias" value={agroindustries.length.toLocaleString("pt-BR")}>
-      <small>Parceiras cadastradas</small>
-    </MetricCard>
-  );
-}
+const formatHa = (n: number) =>
+  `${n.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} ha`;
 
-async function AreasKpi() {
+/** Hectares das áreas ativas: próprios + arrendados (a área em si não é contada, só seus hectares). */
+async function AreaTotalKpi() {
   const token = await authedToken();
-  const [areas, cultures] = await Promise.all([
-    getTotalCached(token, "/areas").catch(() => 0),
-    getTotalCached(token, "/plantedculture").catch(() => 0),
-  ]);
-  return (
-    <MetricCard icon="map" label="Áreas Rurais" value={areas.toLocaleString("pt-BR")}>
-      <small>{cultures.toLocaleString("pt-BR")} culturas plantadas</small>
-    </MetricCard>
-  );
-}
-
-/** Contagem sai da 1ª página (rápido); a soma em R$ chega depois, em um Suspense próprio. */
-async function EntriesKpi({
-  searchParams,
-  path,
-  dateKey,
-  icon,
-  label,
-}: SearchProps & { path: string; dateKey: string; icon: string; label: string }) {
-  const token = await authedToken();
-  const { start, end } = await periodOf(searchParams);
-  const head = await orNull(getEntriesHeadCached<Row>(token, path, start, end));
-
-  if (!head) {
+  const areas = await orNull(getAreasCatalog(token));
+  if (!areas) {
     return (
-      <MetricCard icon={icon} label={label} value="Indisponível">
+      <MetricCard icon="map" label="Área total" value="Indisponível">
         <small>Falha ao consultar a API</small>
       </MetricCard>
     );
   }
-
+  let owned = 0;
+  let rented = 0;
+  for (const a of areas) {
+    if (a.is_active === false) continue;
+    owned += Number(a.hectares_owned) || 0;
+    rented += Number(a.hectares_rented) || 0;
+  }
   return (
-    <MetricCard icon={icon} label={label} value={`${head.total.toLocaleString("pt-BR")} lanç.`}>
-      <Suspense fallback={<small>Total: calculando…</small>}>
-        <EntriesSum searchParams={searchParams} path={path} dateKey={dateKey} total={head.total} />
-      </Suspense>
+    <MetricCard icon="map" label="Área total" value={formatHa(owned + rented)}>
+      <small>
+        {formatHa(owned)} próprios · {formatHa(rented)} arrendados
+      </small>
     </MetricCard>
   );
 }
 
-async function EntriesSum({
-  searchParams,
-  path,
-  dateKey,
-  total,
-}: SearchProps & { path: string; dateKey: string; total: number }) {
-  if (Math.ceil(total / API_PAGE_SIZE) > ENTRIES_MAX_PAGES) {
-    return <small>Soma em R$ indisponível: volume alto, filtre por mês</small>;
+/** Hectares efetivamente plantados nas culturas ativas, com o peso sobre a área total. */
+async function AreaPlantadaKpi() {
+  const token = await authedToken();
+  const [areas, cultures] = await Promise.all([
+    orNull(getAreasCatalog(token)),
+    orNull(getPlantedCulturesCatalog(token)),
+  ]);
+  if (!areas || !cultures) {
+    return (
+      <MetricCard icon="grass" label="Área plantada" value="Indisponível">
+        <small>Falha ao consultar a API</small>
+      </MetricCard>
+    );
   }
+  const total = areas
+    .filter((a) => a.is_active !== false)
+    .reduce((acc, a) => acc + (Number(a.hectares_owned) || 0) + (Number(a.hectares_rented) || 0), 0);
+  const planted = cultures
+    .filter((c) => c.is_active !== false)
+    .reduce((acc, c) => acc + (Number(c.planted_area) || 0), 0);
+  const pct = total > 0 ? ` · ${((planted / total) * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% da área total` : "";
+  return (
+    <MetricCard icon="grass" label="Área plantada" value={formatHa(planted)}>
+      <small>Culturas ativas{pct}</small>
+    </MetricCard>
+  );
+}
 
+/** Litros produzidos no período (indicadores mensais do Elabore) pelas fazendas liberadas ao usuário. */
+async function ProducaoKpi({ searchParams }: SearchProps) {
   const token = await authedToken();
   const { start, end } = await periodOf(searchParams);
-  const full = await orNull(getPeriodEntriesCached<Row>(token, path, start, end, ENTRIES_MAX_PAGES));
-
-  if (!full) return <small>Total indisponível</small>;
-
-  const sum = full.items
-    .filter((r) => inPeriod(r, dateKey, start, end))
-    .reduce((acc, r) => acc + (Number(r.amount_total) || 0), 0);
-
-  return <small>Total: {formatCellValue(sum, "currency")}</small>;
+  const properties = await getPropertiesCatalog(token).catch(() => []);
+  const codes = new Set(
+    properties.filter((p) => p.labor_rural_code).map((p) => p.labor_rural_code!.trim().toUpperCase()),
+  );
+  const liters = await orNull(getMilkProductionTotal(start, end, codes));
+  if (liters === null) {
+    return (
+      <MetricCard icon="water_drop" label="Produção total de leite" value="Indisponível">
+        <small>Falha ao consultar os indicadores</small>
+      </MetricCard>
+    );
+  }
+  return (
+    <MetricCard
+      icon="water_drop"
+      label="Produção total de leite"
+      value={`${liters.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} L`}
+    >
+      <small>Soma dos indicadores mensais no período</small>
+    </MetricCard>
+  );
 }
 
 async function RecentRevenues({ searchParams }: SearchProps) {
@@ -359,7 +349,7 @@ async function RecentRevenues({ searchParams }: SearchProps) {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Competência</th>
+              <th>Data</th>
               <th>Propriedade</th>
               <th>Descrição</th>
               <th className="text-right">Valor (R$)</th>

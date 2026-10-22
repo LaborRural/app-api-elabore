@@ -97,6 +97,28 @@ export async function getProducerNames(): Promise<Map<string, string>> {
 }
 
 // ------------------------------------------------------------------------------
+// Data e horário de referência do processamento dos dados nas tabelas do Elabore
+// ------------------------------------------------------------------------------
+const PROC_DATE_TTL_MS = 5 * 60 * 1000;
+const procDateCache = new Map<string, { value: string | null; expiresAt: number }>();
+
+/** Consulta a data_processamento mais recente gravada na tabela pelo notebook. */
+export async function getDataProcessamento(table: string): Promise<string | null> {
+  const cached = procDateCache.get(table);
+  if (cached && Date.now() < cached.expiresAt) return cached.value;
+
+  try {
+    const res = await elaboreFetch(`${table}?select=data_processamento&limit=1&order=data_processamento.desc`);
+    const rows = (await res.json()) as { data_processamento?: string | null }[];
+    const val = rows[0]?.data_processamento ?? null;
+    procDateCache.set(table, { value: val, expiresAt: Date.now() + PROC_DATE_TTL_MS });
+    return val;
+  } catch {
+    return null;
+  }
+}
+
+// ------------------------------------------------------------------------------
 // Catálogo de colunas: dicionário (rótulo, ordem, grupo) + tipo do Postgres (OpenAPI)
 // ------------------------------------------------------------------------------
 let catalogCache: { byTable: Map<string, ElaboreColumn[]>; expiresAt: number } | null = null;
@@ -210,3 +232,25 @@ export async function queryElaboreAll(
   }
   return all;
 }
+
+// ------------------------------------------------------------------------------
+// Produção total de leite (litros) no período, para o card da página inicial
+// ------------------------------------------------------------------------------
+
+/** Soma milk_produced das fazendas (códigos LR) entre start e end (AAAA-MM-DD, end inclusivo). */
+export async function getMilkProductionTotal(start: string, end: string, codes: Set<string>): Promise<number> {
+  let total = 0;
+  for (let page = 0; page < 60; page++) {
+    const res = await elaboreFetch(
+      `raw_indicadores_mensais?select=labor_rural_code,milk_produced&reference_month=gte.${start}&reference_month=lte.${end}&order=id.asc&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`,
+    );
+    const batch = (await res.json()) as { labor_rural_code: string | null; milk_produced: number | null }[];
+    for (const r of batch) {
+      const code = r.labor_rural_code?.trim().toUpperCase();
+      if (code && codes.has(code)) total += Number(r.milk_produced) || 0;
+    }
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return total;
+}
+

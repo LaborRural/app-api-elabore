@@ -314,3 +314,23 @@ export async function getAgroindustriesCatalog(token?: string): Promise<Agroindu
     return [];
   }
 }
+
+export type AreaItem = {
+  is_active?: boolean;
+  hectares_owned?: number | string | null;
+  hectares_rented?: number | string | null;
+};
+
+export type PlantedCultureItem = {
+  is_active?: boolean;
+  planted_area?: number | string | null;
+};
+
+/** Todas as áreas cadastradas (cache em memória), para somar hectares na página inicial. */
+export async function getAreasCatalog(token: string): Promise<AreaItem[]> {
+  return cachedCatalog<AreaItem>(token, "/areas", 100);
+}
+
+export async function getPlantedCulturesCatalog(token: string): Promise<PlantedCultureItem[]> {
+  return cachedCatalog<PlantedCultureItem>(token, "/plantedculture", 100);
+}
