@@ -7,6 +7,7 @@ import type { ApexOptions } from "apexcharts";
 import type { AgroindustryItem, PropertySummaryItem } from "@/lib/api";
 import { ETAPAS, SISTEMA_ROTULO, type DetalheLinha, type PainelCustoData, type PorSistema, type Sistema } from "@/lib/painel-custo-tipos";
 import PainelCustoTabela, { type TabelaColuna } from "./painel-custo-tabela";
+import FullSheetButton from "./full-sheet-button";
 import ScreenFilters, { SelectBox } from "./screen-filters";
 
 const Chart = dynamic(() => import("react-apexcharts"), {
@@ -104,12 +105,7 @@ export default function PainelCusto({ data, properties, agroindustries, fullShee
             <span className="material-symbols-rounded" aria-hidden="true">home_work</span>
             Fazendas: <strong>{nFazendas ? nf(nFazendas) : "–"}</strong>
           </div>
-          {fullSheetHref && (
-            <a href={fullSheetHref} download className="btn-table-export">
-              <span className="material-symbols-rounded" style={{ fontSize: 17 }}>cloud_download</span>
-              <span>Planilha completa</span>
-            </a>
-          )}
+          {fullSheetHref && <FullSheetButton href={fullSheetHref} />}
         </div>
         <ScreenFilters filters={["prop", "agro"]} properties={properties} agroindustries={agroindustries} />
       </div>

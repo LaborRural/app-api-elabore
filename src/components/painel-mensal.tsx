@@ -11,6 +11,7 @@ import PainelFacets from "./painel-facets";
 import { rangeText } from "@/lib/painel-format";
 import SummaryCard, { formatDecimal } from "./summary-card";
 import PrintButton from "./print-button";
+import FullSheetButton from "./full-sheet-button";
 import ScreenFilters from "./screen-filters";
 
 type Props = {
@@ -157,17 +158,16 @@ export default function PainelMensal({ data: fullData, properties, agroindustrie
       <div className="lancamentos-filtro-bar">
         <div className="lanc-filtro-esq">
           {exportHref && (
-            <a href={exportHref} download className="btn-table-export" title="Exporta os indicadores mensais da fazenda e do período filtrados">
-              <span className="material-symbols-rounded" style={{ fontSize: 17 }}>download</span>
-              <span>Exportar Excel</span>
-            </a>
+            <FullSheetButton
+              href={exportHref}
+              label="Exportar Excel"
+              downloadingLabel="Exportando Excel…"
+              icon="download"
+              fallbackFilename="indicadores_mensais.xlsx"
+              title="Exporta os indicadores mensais da fazenda e do período filtrados"
+            />
           )}
-          {fullSheetHref && (
-            <a href={fullSheetHref} download className="btn-table-export">
-              <span className="material-symbols-rounded" style={{ fontSize: 17 }}>cloud_download</span>
-              <span>Planilha completa</span>
-            </a>
-          )}
+          {fullSheetHref && <FullSheetButton href={fullSheetHref} />}
           {farm && <PrintButton onBeforePrint={() => setPrinting(true)} onAfterPrint={() => setPrinting(false)} />}
         </div>
         <ScreenFilters filters={["ano", "mes", "prop", "agro"]} properties={properties} agroindustries={agroindustries} />

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hideUuidColumnsInXlsxBuffer } from "@/lib/excel-format";
 import { FULL_SHEETS, latestFullSheet, type FullSheetKind } from "@/lib/sharepoint";
 import { getToken, isInternalSession } from "@/lib/session";
 
@@ -20,13 +21,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ tipo: string }
   try {
     const file = await latestFullSheet(tipo as FullSheetKind);
     const res = await fetch(file.downloadUrl, { cache: "no-store" });
-    if (!res.ok || !res.body) throw new Error(`SharePoint ${res.status} ao baixar ${file.name}`);
-    return new NextResponse(res.body, {
+    if (!res.ok) throw new Error(`SharePoint ${res.status} ao baixar ${file.name}`);
+    const rawBuffer = await res.arrayBuffer();
+    const buffer = await hideUuidColumnsInXlsxBuffer(rawBuffer, `${file.name}:${file.size}`);
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${file.name}"`,
-        "Content-Length": String(file.size),
+        "Content-Length": String(buffer.byteLength),
         "Cache-Control": "no-store",
       },
     });

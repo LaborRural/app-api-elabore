@@ -6,11 +6,12 @@ export type ExportFormat = "excel" | "csv" | "pdf-resumido" | "pdf-expandido";
 
 type Props = {
   onExport: (format: ExportFormat) => void;
+  onCancel?: () => void;
   disabled?: boolean;
   exportingFormat?: string | null;
 };
 
-export default function ExportMenu({ onExport, disabled, exportingFormat }: Props) {
+export default function ExportMenu({ onExport, onCancel, disabled, exportingFormat }: Props) {
   const [openMenu, setOpenMenu] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -30,40 +31,71 @@ export default function ExportMenu({ onExport, disabled, exportingFormat }: Prop
     <div className="lr-export-wrap" ref={wrapRef}>
       <button
         type="button"
-        className="btn-table-export"
-        aria-haspopup="menu"
-        aria-expanded={openMenu}
-        disabled={disabled}
+        className={`btn-table-export${exportingFormat ? " is-downloading" : ""}`}
+        aria-haspopup={exportingFormat ? undefined : "menu"}
+        aria-expanded={exportingFormat ? undefined : openMenu}
+        aria-busy={Boolean(exportingFormat)}
+        disabled={disabled && !exportingFormat}
+        title={exportingFormat ? "Clique para cancelar a exportação" : undefined}
         onClick={() => {
+          if (exportingFormat) {
+            onCancel?.();
+            return;
+          }
           setOpenMenu((prev) => !prev);
           setOpenSubmenu(false);
         }}
       >
-        <svg
-          className="ic-exp-dl"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />
-        </svg>
+        {exportingFormat ? (
+          <svg
+            className="ic-dl-anim"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <g className="ic-dl-arrow">
+              <path d="M12 3v11" />
+              <path d="m7.5 10.5 4.5 4.5 4.5-4.5" />
+            </g>
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+          </svg>
+        ) : (
+          <svg
+            className="ic-exp-dl"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />
+          </svg>
+        )}
         <span>{exportingFormat ? `Exportando ${exportingFormat}…` : "Exportar"}</span>
-        <svg
-          className="ic-exp-arrow"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
+        {exportingFormat ? (
+          <span className="dl-cancel-badge" aria-label="Cancelar exportação">
+            ✕ Cancelar
+          </span>
+        ) : (
+          <svg
+            className="ic-exp-arrow"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        )}
       </button>
 
       {openMenu && (

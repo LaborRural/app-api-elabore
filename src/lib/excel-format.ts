@@ -17,12 +17,32 @@ import { formatCellValue } from "./format";
  * - Datas formatadas como dd/mm/yyyy e centralizadas
  * - Largura automática das colunas (mín. 10, máx. 60, amostra de até 100 linhas)
  */
+const UUID_VALUE_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_HEADER_RE = /^(id|id_.+|idfazenda|id\s+fazenda)$/i;
+
+/** Identifica colunas de ID técnico / UUID para ocultá-las nas planilhas exportadas. */
+export function isUuidColumn(col: ColumnDef, rows: Record<string, unknown>[]): boolean {
+  if (UUID_HEADER_RE.test(col.key.trim()) || UUID_HEADER_RE.test(col.label.trim())) {
+    return true;
+  }
+  const sampleLimit = Math.min(rows.length, 25);
+  for (let i = 0; i < sampleLimit; i++) {
+    const raw = getNestedValue(rows[i], col.key);
+    if (raw !== null && raw !== undefined && raw !== "") {
+      return UUID_VALUE_RE.test(String(raw).trim());
+    }
+  }
+  return false;
+}
+
 export async function generateStyledXlsxBuffer(
   sheetName: string,
   columns: ColumnDef[],
   rows: Record<string, unknown>[],
 ): Promise<Buffer> {
-  const exportCols = columns.filter((c) => c.type !== "parcelas_link");
+  const exportCols = columns.filter(
+    (c) => c.type !== "parcelas_link" && !isUuidColumn(c, rows),
+  );
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Labor Rural - Elabore";
@@ -199,7 +219,9 @@ export function generateCsvContent(
   columns: ColumnDef[],
   rows: Record<string, unknown>[],
 ): string {
-  const exportCols = columns.filter((c) => c.type !== "parcelas_link");
+  const exportCols = columns.filter(
+    (c) => c.type !== "parcelas_link" && !isUuidColumn(c, rows),
+  );
 
   const escapeCsv = (val: string): string => {
     const clean = val === "-" ? "" : val;
@@ -221,5 +243,63 @@ export function generateCsvContent(
   );
 
   return `\uFEFF${[headerLine, ...dataLines].join("\r\n")}`;
+}
+
+const processedWorkbookCache = new Map<string, Buffer>();
+
+/**
+ * Recebe o buffer de uma planilha .xlsx existente (ex.: Planilha Completa do SharePoint)
+ * e oculta todas as colunas cujo cabeçalho ou valores sejam IDs UUID.
+ */
+export async function hideUuidColumnsInXlsxBuffer(
+  input: ArrayBuffer | Buffer,
+  cacheKey?: string,
+): Promise<Buffer> {
+  if (cacheKey) {
+    const cached = processedWorkbookCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const nodeBuf = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await workbook.xlsx.load(nodeBuf as any);
+
+  workbook.eachSheet((ws) => {
+    const headerRow = ws.getRow(1);
+    const maxRow = Math.min(ws.rowCount, 30);
+
+    headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      const headerText = String(cell.value ?? "").trim();
+      let isUuid = UUID_HEADER_RE.test(headerText);
+
+      if (!isUuid) {
+        for (let r = 2; r <= maxRow; r++) {
+          const rawVal = ws.getRow(r).getCell(colNumber).value;
+          if (rawVal !== null && rawVal !== undefined && rawVal !== "") {
+            const str = typeof rawVal === "object" && "text" in rawVal ? String(rawVal.text) : String(rawVal);
+            if (UUID_VALUE_RE.test(str.trim())) {
+              isUuid = true;
+            }
+            break;
+          }
+        }
+      }
+
+      if (isUuid) {
+        ws.getColumn(colNumber).hidden = true;
+      }
+    });
+  });
+
+  const out = Buffer.from(await workbook.xlsx.writeBuffer());
+  if (cacheKey) {
+    if (processedWorkbookCache.size >= 6) {
+      const oldest = processedWorkbookCache.keys().next().value;
+      if (oldest) processedWorkbookCache.delete(oldest);
+    }
+    processedWorkbookCache.set(cacheKey, out);
+  }
+  return out;
 }
 

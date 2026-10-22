@@ -669,6 +669,87 @@ a.btn-table-export {
   text-decoration: none;
 }
 
+/* Efeito visual de download ativo no botão "Planilha completa" e "Exportar Excel" */
+.btn-table-export.is-downloading {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--brand-2);
+  background: var(--green-050);
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.btn-table-export.is-downloading:hover {
+  border-color: var(--vermelho-490, #dc2626);
+}
+
+.btn-table-export .dl-cancel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--vermelho-490, #dc2626);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.btn-table-export.is-downloading:hover .dl-cancel-badge {
+  background: var(--vermelho-490, #dc2626);
+  color: #ffffff;
+}
+
+.btn-table-export.is-downloading::after {
+  content: "";
+  position: absolute;
+  left: -40%;
+  bottom: 0;
+  width: 40%;
+  height: 2.5px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, var(--brand-2), var(--mint), transparent);
+  animation: lrDownloadBar 1.15s ease-in-out infinite;
+}
+
+.btn-table-export .ic-dl-anim {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--brand-2);
+}
+
+.btn-table-export .ic-dl-arrow {
+  animation: lrDownloadArrow 0.95s ease-in-out infinite;
+}
+
+@keyframes lrDownloadArrow {
+  0% {
+    transform: translateY(-2.5px);
+    opacity: 0.45;
+  }
+  55% {
+    transform: translateY(1.5px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-2.5px);
+    opacity: 0.45;
+  }
+}
+
+@keyframes lrDownloadBar {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
 /* ---------- Cards de KPI (summary-card.tsx) ---------- */
 .summary-grid {
   display: grid;
@@ -915,4 +996,100 @@ a.btn-table-export {
   overflow-wrap: anywhere;
   line-height: 1.4;
   vertical-align: top;
+}
+
+
+/* ---------- Carregamento de Tela Inteira / Área de Conteúdo ---------- */
+.elabore-fullscreen-loader {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: calc(100vh - var(--header-h) - var(--footer-h) - 34px);
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  animation: lrPageLoaderFade 140ms ease-out;
+}
+
+.elabore-page-loader {
+  position: fixed;
+  top: var(--header-h);
+  bottom: var(--footer-h);
+  left: var(--sidebar-w);
+  right: 0;
+  z-index: 78;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+  transition: left 180ms ease;
+  animation: lrPageLoaderFade 140ms ease-out;
+}
+
+.elabore-shell.sidebar-collapsed .elabore-page-loader {
+  left: var(--sidebar-collapsed-w);
+}
+
+@media (max-width: 860px) {
+  .elabore-page-loader {
+    left: 0;
+    bottom: 58px;
+  }
+}
+
+:root[data-theme="dark"] .elabore-page-loader,
+:root[data-tema="escuro"] .elabore-page-loader {
+  background: rgba(15, 31, 29, 0.85);
+}
+
+.elabore-page-loader-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 36px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 36px rgba(0, 63, 60, 0.14);
+  text-align: center;
+}
+
+.elabore-page-loader-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 3.5px solid var(--green-200);
+  border-top-color: var(--brand-2);
+  animation: lrPageSpinner 0.75s linear infinite;
+}
+
+.elabore-page-loader-title {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.elabore-page-loader-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+@keyframes lrPageSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes lrPageLoaderFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
