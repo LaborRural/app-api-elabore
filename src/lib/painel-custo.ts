@@ -1,6 +1,7 @@
 import "server-only";
 import type { PropertySummaryItem } from "./api";
 import { ETAPAS, SISTEMAS, SISTEMA_ROTULO, type EtapaKey, type PainelCustoData, type PainelCustoParams, type PorSistema, type Sistema, type DetalheLinha } from "./painel-custo-tipos";
+import { resolveElaboreScope } from "./elabore-scope";
 import { isInternalSession } from "./session";
 import { getElaboreColumns, queryElaboreAll } from "./supabase";
 
@@ -143,19 +144,15 @@ export async function resolvePainelCusto(
   }
 
   // Escopo: só fazendas que a API libera para o usuário (+ filtros Fazenda/Agroindústria).
-  // Para sessão interna/global sem filtro de Fazenda/Agroindústria, consulta a tabela inteira.
-  const internal = await isInternalSession();
-  const hasGlobalScope =
-    internal || new Set(properties.map((p) => p.id_agroindustry).filter(Boolean)).size > 1;
+  // Só a sessão interna sem filtro de Fazenda/Agroindústria consulta a tabela inteira.
+  const scope = resolveElaboreScope(properties, {
+    internal: await isInternalSession(),
+    prop: params.prop,
+    agro: params.agro,
+  });
+  if (scope.kind === "empty") return vazio("Nenhuma fazenda disponível para os filtros escolhidos.");
   const filters: [string, string][] = [];
-  if (!hasGlobalScope || params.prop || params.agro) {
-    let scope = properties.filter((p) => p.labor_rural_code);
-    if (params.prop) scope = scope.filter((p) => p.id_property === params.prop);
-    if (params.agro) scope = scope.filter((p) => p.id_agroindustry === params.agro);
-    const codes = [...new Set(scope.map((p) => plain(p.labor_rural_code!.trim().toUpperCase())))];
-    if (codes.length === 0) return vazio("Nenhuma fazenda disponível para os filtros escolhidos.");
-    filters.push(["labor_rural_code", `in.(${codes.join(",")})`]);
-  }
+  if (scope.kind === "codes") filters.push(["labor_rural_code", `in.(${scope.codes.map(plain).join(",")})`]);
 
   const fetched = await queryElaboreAll({
     table: TABLE,

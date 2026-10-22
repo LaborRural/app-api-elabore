@@ -195,11 +195,16 @@ export async function resolveScreenData(
 
   // Telas de INDICADORES: schema "elabore" do Supabase, filtrado e paginado no banco.
   if (screen.elabore) {
-    return resolveElaboreScreen(screen, screen.elabore, rawParams, properties, agroindustries, {
+    const data = await resolveElaboreScreen(screen, screen.elabore, rawParams, properties, agroindustries, {
       forExport,
       page: pageNum,
       size: sizeNum,
     });
+    // Catálogo fora do ar: usuário comum fica sem fazendas, então avisa em vez de só mostrar vazio.
+    if (catalogError && data.rows.length === 0) {
+      data.notice = "Não foi possível carregar as fazendas do seu usuário. Recarregue a página.";
+    }
+    return data;
   }
 
   if (screen.unavailableReason) {

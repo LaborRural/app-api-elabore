@@ -2,6 +2,7 @@ import "server-only";
 import type { AgroindustryItem, PropertySummaryItem } from "./api";
 import type { ResolvedScreenData, ScreenFilterParams } from "./screen-data";
 import type { ColumnDef, ElaboreSourceDef, ScreenDef, ScreenTabDef } from "./screens";
+import { resolveElaboreScope } from "./elabore-scope";
 import { isInternalSession } from "./session";
 import { getElaboreColumns, queryElabore, queryElaboreAll, type ElaboreColumn } from "./supabase";
 
@@ -9,7 +10,7 @@ import { getElaboreColumns, queryElabore, queryElaboreAll, type ElaboreColumn } 
 // Só entram fazendas cujo código (labor_rural_code) está no catálogo de propriedades
 // que a API Elabore devolve para o usuário logado: cada agroindústria continua vendo
 // apenas as próprias fazendas, mesmo que manipule os filtros da URL.
-// Para sessões internas da equipe Labor Rural (ou escopo global multi-agroindústria) sem
+// Para sessões internas da equipe Labor Rural sem
 // filtro de Propriedade/Agroindústria ativo, a consulta traz 100% da tabela no Supabase,
 // incluindo registros sem labor_rural_code ou com códigos históricos fora de /properties.
 
@@ -108,32 +109,19 @@ export async function resolveElaboreScreen(
     return empty(`A tabela elabore.${source.table} ainda não foi carregada pelo notebook do lr-indicadores-elabore.`);
   }
 
-  // Escopo: usuários internos/globais sem filtro de Propriedade/Agroindústria consultam a base
-  // completa (incluindo registros sem código LR ou com código histórico fora de /properties).
-  const internal = await isInternalSession();
-  const hasGlobalScope =
-    internal || new Set(properties.map((p) => p.id_agroindustry).filter(Boolean)).size > 1;
+  // Escopo: só a equipe interna sem filtro de Propriedade/Agroindústria consulta a base completa
+  // (incluindo registros sem código LR). Os demais veem só as fazendas do próprio /properties.
+  const scope = resolveElaboreScope(properties, {
+    internal: await isInternalSession(),
+    prop: rawParams.prop,
+    agro: rawParams.agro,
+    hasIdPropertyColumn: allColumns.some((c) => c.key === "id_property"),
+  });
 
   const filters: [string, string][] = [];
-  if (!hasGlobalScope || rawParams.prop || rawParams.agro) {
-    let scope = properties;
-    if (rawParams.prop) scope = scope.filter((p) => p.id_property === rawParams.prop);
-    if (rawParams.agro) scope = scope.filter((p) => p.id_agroindustry === rawParams.agro);
-    const codes = [
-      ...new Set(
-        scope
-          .filter((p) => p.labor_rural_code)
-          .map((p) => p.labor_rural_code!.trim().toUpperCase()),
-      ),
-    ];
-    if (codes.length > 0) {
-      filters.push([source.codeColumn, `in.(${codes.map(quote).join(",")})`]);
-    } else if (rawParams.prop && scope.length > 0 && allColumns.some((c) => c.key === "id_property")) {
-      filters.push(["id_property", `eq.${quote(rawParams.prop)}`]);
-    } else {
-      return empty();
-    }
-  }
+  if (scope.kind === "empty") return empty();
+  if (scope.kind === "codes") filters.push([source.codeColumn, `in.(${scope.codes.map(quote).join(",")})`]);
+  else if (scope.kind === "property") filters.push(["id_property", `eq.${quote(scope.idProperty)}`]);
   const orGroups: string[] = [];
 
   // Período (Ano / Mês)
