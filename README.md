@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Labor Rural — API Elabore (Painel Web e Indicadores)
 
-## Getting Started
+**Versão Atual:** `v0.7.0`
 
-First, run the development server:
+Interface analítica e painel de inteligência de dados da **Labor Rural**, conectado à API do Elabore e ao banco de dados analítico no Supabase. Permite o acompanhamento operacional, zootécnico e econômico-financeiro de fazendas de pecuária de leite e agroindústrias parceiras.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 🚀 Funcionalidades Principais
+
+- **Painel de Indicadores Mensais (`/indicadores-mensais`)**:
+  - Acompanhamento de indicadores de volume de leite (L/dia), produtividade (L/vaca em lactação/dia), qualidade (CCS, CBT, % de gordura e proteína).
+  - Gráficos temporais interativos via ApexCharts com seleção de períodos e metas.
+  - Relatório impresso em formato padrão A4 para uso por consultores no campo.
+
+- **Painel Anual (`/indicadores-anuais`)**:
+  - Consolidação histórica plurianual e médias ponderadas anuais da propriedade.
+  - Análise de evolução e comparativo entre safras/anos.
+
+- **Painel de Custo de Forrageira (`/custo-forrageira`)**:
+  - Detalhamento de custos operacionais zootécnicos por hectare e tonelada de matéria seca (MS).
+  - Abertura por etapas (Implantação, Tratos Culturais, Colheita) e por sistemas de cultivo (Pastejo, Silagem, Feno).
+
+- **Tabelas Analíticas e Exportação**:
+  - Visualização tabular detalhada com código Labor Rural fixo na primeira coluna.
+  - Exportação direta para planilhas Excel (`.xlsx`) com formatação e download da planilha completa consolidada.
+  - Motor de humanização e agrupamento de inconsistências de dados e critérios violados.
+
+- **Arquitetura Visual e Acessibilidade**:
+  - Design System oficial Labor Rural (Dark/Light mode persistente).
+  - Barra lateral retrátil com accordion de módulos (Cadastros, Operações, Análise).
+  - Modal de comunicação de novidades em campo e identificação de usuário logado.
+
+---
+
+## 🛠️ Tecnologias Utilizadas
+
+- **Framework**: [Next.js](https://nextjs.org/) (App Router, Server Components & Route Handlers)
+- **Linguagem**: TypeScript
+- **Estilização**: Tailwind CSS v4 & Folha de Estilos Institucional Labor Rural
+- **Gráficos e BI**: [ApexCharts](https://apexcharts.com/) / `react-apexcharts`
+- **Planilhas e Exportação**: `exceljs`
+- **Ícones**: React Icons & Material Symbols Rounded
+- **Banco de Dados & Autenticação**: Supabase & Cookie de sessão `httpOnly`
+
+---
+
+## 📦 Como Executar o Projeto
+
+### Pré-requisitos
+- Node.js (v20 ou superior recomendado)
+- NPM
+
+### Inicialização Rápida no Windows
+Execute o script utilitário incluído na raiz:
+```cmd
+teste_local.bat
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Inicialização Manual
+1. Instale as dependências:
+   ```bash
+   npm install
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. Configure as variáveis de ambiente:
+   ```bash
+   copy .env.example .env.local
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Inicie o servidor de desenvolvimento:
+   ```bash
+   npm run dev
+   ```
+   Acesse [http://localhost:3000](http://localhost:3000) no seu navegador.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🧪 Testes de Versionamento
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Para validar o padrão oficial de versionamento e integridade das versões e novidades:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run test:version
+```
+Ou diretamente:
+```bash
+node --test data/tests/*.test.mjs
+```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📜 Histórico de Versões
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Consulte o arquivo [CHANGELOG.md](file:///c:/Users/Guilherme/LABOR%20RURAL/Analytics%20-%20Departamento%20Analytics/REPOSITORIOS_PROJETOS_GIT/APP/app-api-elabore/CHANGELOG.md) para visualizar o mapeamento detalhado de todas as alterações, entregas e versões lançadas neste repositório.
+
+Este projeto segue as diretrizes da skill **`lr-app-versions`** da Labor Rural.

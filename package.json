@@ -1,12 +1,13 @@
 {
   "name": "app-api-elabore",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:version": "node --test data/tests/*.test.mjs"
   },
   "dependencies": {
     "apexcharts": "^4.7.0",
